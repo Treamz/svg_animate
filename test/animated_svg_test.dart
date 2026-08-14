@@ -61,7 +61,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(_frameLoader(tester).frames.frames.length, 4);
+    expect(_frameLoader(tester).frames.frameCount, 4);
     expect(_frameLoader(tester).frames.duration, const Duration(seconds: 1));
     expect(_frameLoader(tester).frames.loops, isTrue);
   });
@@ -123,7 +123,7 @@ void main() {
     await tester.pumpWidget(AnimatedSvgPicture.string(_static, width: 100, height: 100));
     await tester.pump();
 
-    expect(_frameLoader(tester).frames.frames.length, 1);
+    expect(_frameLoader(tester).frames.frameCount, 1);
     expect(_frameLoader(tester).frames.isAnimated, isFalse);
     // No ticker should be running, so the test can settle.
     await tester.pumpAndSettle();
@@ -233,13 +233,13 @@ void main() {
       AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
     );
     await tester.pump();
-    expect(_frameLoader(tester).frames.frames.length, 4);
+    expect(_frameLoader(tester).frames.frameCount, 4);
 
     await tester.pumpWidget(
       AnimatedSvgPicture.string(_spinner, frameRate: 8, width: 100, height: 100),
     );
     await tester.pump();
-    expect(_frameLoader(tester).frames.frames.length, 8);
+    expect(_frameLoader(tester).frames.frameCount, 8);
   });
 
   testWidgets('follows the document when repeat is not given', (WidgetTester tester) async {

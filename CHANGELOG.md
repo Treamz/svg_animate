@@ -1,4 +1,18 @@
-## 0.2.1
+## 0.3.0
+
+* Stores what the compiled frames have in common once instead of in every frame.
+  Consecutive frames describe the same document with a few numbers changed, and
+  anything the SVG embeds sits at the front of each of them unchanged, so the
+  run of bytes they all begin with is kept once and rebuilt into a frame when it
+  is asked for. On a 450x450 banner carrying five embedded bitmaps this took the
+  compiled animation from 27.5 MB to 5.1 MB at the default frame rate, and cost
+  0.1 ms per frame change to put back together. SVGs that embed nothing are
+  unaffected either way.
+* **Breaking:** `AnimatedSvgFrames.frames` is replaced by `frameCount` and
+  `frameAt`, since the frames are no longer held whole. `compiledByteSize`
+  reports how much memory they take, which is worth checking before raising
+  `frameRate` on an image-heavy SVG.
+
 
 * Decodes an image embedded in an animated SVG once for the whole animation
   instead of once per frame. The renderer namespaces its image cache by the hash

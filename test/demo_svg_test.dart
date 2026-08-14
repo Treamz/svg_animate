@@ -22,10 +22,10 @@ void main() {
       colorMapper: null,
       frameRate: 10,
     );
-    expect(frames.frames.length, 24);
+    expect(frames.frameCount, 24);
     expect(
-      frames.frames.first.buffer.asUint8List(),
-      isNot(frames.frames[12].buffer.asUint8List()),
+      frames.frameAt(0).buffer.asUint8List(),
+      isNot(frames.frameAt(12).buffer.asUint8List()),
       reason: 'the demo should look different halfway through',
     );
   });
