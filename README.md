@@ -28,7 +28,7 @@ AnimatedSvgPicture.asset('assets/spinner.svg', width: 48, height: 48)
 
 ```yaml
 dependencies:
-  svg_animate: ^0.2.0
+  svg_animate: ^0.2.1
 ```
 
 There are constructors for every source `flutter_svg` supports:
@@ -131,9 +131,10 @@ so drawing one costs the same as drawing a still SVG.
 The trade-off is loading: compiling *N* frames takes roughly *N* times as long
 as loading a still SVG, and the frames stay in memory while they are cached.
 Watch out for SVGs with embedded raster images: the image data is repeated in
-every compiled frame, so a 450×450 banner with a few embedded photographs can
-reach tens of megabytes at the default frame rate. Lower `frameRate` for those,
-or reach for a renderer that does not pre-compile.
+every compiled frame, so a 450×450 banner carrying a few embedded bitmaps can
+reach tens of megabytes at the default frame rate. Drawing them is not affected
+— an embedded image is decoded once for the whole animation, not once per frame
+— but the compiled bytes do add up, so lower `frameRate` for such files.
 
 - `frameRate` (default `60`) — frames compiled per second of animation.
 - `maxFrames` (default `300`) — ceiling; longer animations are sampled at a
