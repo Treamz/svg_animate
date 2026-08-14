@@ -1,6 +1,6 @@
 name: svg_animate
 description: Plays SVGs that declare their own animation, in SMIL or CSS keyframes, on top of the vector_graphics renderer that flutter_svg uses.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/Treamz/svg_animate
 issue_tracker: https://github.com/Treamz/svg_animate/issues
 

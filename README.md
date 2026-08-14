@@ -28,7 +28,7 @@ AnimatedSvgPicture.asset('assets/spinner.svg', width: 48, height: 48)
 
 ```yaml
 dependencies:
-  svg_animate: ^0.1.0
+  svg_animate: ^0.2.0
 ```
 
 There are constructors for every source `flutter_svg` supports:
@@ -88,6 +88,9 @@ finishes.
 - **CSS**: `@keyframes` in a `<style>` element, driven by the `animation`
   shorthand or its longhand properties, with `transform-origin` resolved against
   the view box.
+- **CSS motion paths**: `offset-path: path(...)` with an animated
+  `offset-distance` and `offset-rotate`, which is how SVGator and similar
+  editors express movement.
 - Interpolation of numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`,
   and the SVG keywords), number lists, and transform lists.
 
@@ -106,7 +109,11 @@ presentation attribute it already had. `<script>` is not run. Interpolating the
 `d` attribute is not supported; those animations switch between values instead
 of morphing.
 
-If you need filters, path morphing, `<script>`, or SVGator exports, look at
+Filters are not supported at all, animated or otherwise, because the
+`vector_graphics` renderer underneath drops `<filter>` entirely. An SVG that
+relies on one still draws, just without the effect.
+
+If you need filters, path morphing, or `<script>`, look at
 [`full_svg_flutter`](https://pub.dev/packages/full_svg_flutter), which covers
 considerably more of the format at the cost of a heavier dependency set.
 
