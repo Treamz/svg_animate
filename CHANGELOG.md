@@ -1,3 +1,12 @@
+## 0.2.1
+
+* Decodes an image embedded in an animated SVG once for the whole animation
+  instead of once per frame. The renderer namespaces its image cache by the hash
+  code of the loader it is handed, and every frame was handing it a different
+  one. On a 450x450 banner carrying five embedded bitmaps this took the cost of
+  a frame change from 6.8 ms to 1.4 ms, which is what an SVG with no images at
+  all costs.
+
 ## 0.2.0
 
 * Adds support for CSS motion paths: `offset-path: path(...)` driven by an

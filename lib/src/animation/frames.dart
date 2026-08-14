@@ -144,8 +144,14 @@ class AnimatedSvgFrameLoader extends BytesLoader {
       identical(other.frames, frames) &&
       other.frameIndex == frameIndex;
 
+  // Deliberately the same for every frame of one animation, even though the
+  // frames are not equal to each other. The renderer namespaces its image cache
+  // by the hash code of the loader it was given, so sharing one across the
+  // frames lets an image embedded in the SVG be decoded once for the whole
+  // animation rather than again on every frame. Different animations still get
+  // different namespaces, which is what keeps their image ids apart.
   @override
-  int get hashCode => Object.hash(identityHashCode(frames), frameIndex);
+  int get hashCode => identityHashCode(frames);
 
   @override
   String toString() => 'AnimatedSvgFrameLoader(frame $frameIndex of ${frames.frames.length})';
