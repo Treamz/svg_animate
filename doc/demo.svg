@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     viewBox="0 0 440 116" width="440" height="116">
+  <style>
+    .ring {
+      animation: pulse 1.2s ease-out infinite;
+      transform-origin: 165px 46px;
+    }
+    @keyframes pulse {
+      from { transform: scale(0.35); opacity: 1 }
+      to   { transform: scale(1);    opacity: 0 }
+    }
+    .label {
+      font-family: sans-serif;
+      font-size: 9px;
+      fill: #8a8f98;
+    }
+  </style>
+
+  <defs>
+    <path id="track" d="M340 46 C340 26 380 26 380 46 C380 66 340 66 340 46 Z"/>
+  </defs>
+
+  <!-- 1. SMIL: animateTransform + animate -->
+  <circle cx="55" cy="46" r="20" fill="none" stroke="#e3e6ea" stroke-width="6"/>
+  <path d="M55 26 A20 20 0 0 1 75 46" fill="none" stroke="#42a5f5" stroke-width="6"
+        stroke-linecap="round">
+    <animateTransform attributeName="transform" type="rotate"
+                      from="0 55 46" to="360 55 46" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="stroke" values="#42a5f5;#0d47a1;#42a5f5" dur="2.4s"
+             repeatCount="indefinite"/>
+  </path>
+  <text class="label" x="55" y="88" text-anchor="middle">animateTransform</text>
+
+  <!-- 2. CSS @keyframes with transform-origin -->
+  <circle class="ring" cx="165" cy="46" r="22" fill="#42a5f5"/>
+  <circle cx="165" cy="46" r="8" fill="#0d47a1"/>
+  <text class="label" x="165" y="88" text-anchor="middle">@keyframes</text>
+
+  <!-- 3. SMIL: values + keyTimes + spline easing -->
+  <rect x="230" y="42" width="60" height="8" rx="4" fill="#e3e6ea"/>
+  <rect x="230" y="42" width="0" height="8" rx="4" fill="#42a5f5">
+    <animate attributeName="width" values="0;60;60;0" keyTimes="0;0.45;0.55;1"
+             calcMode="spline" keySplines="0.4 0 0.2 1;0 0 1 1;0.4 0 0.2 1"
+             dur="2.4s" repeatCount="indefinite"/>
+  </rect>
+  <text class="label" x="260" y="88" text-anchor="middle">keySplines</text>
+
+  <!-- 4. SMIL: animateMotion along an mpath -->
+  <use xlink:href="#track" fill="none" stroke="#e3e6ea" stroke-width="2"
+       stroke-dasharray="3 3"/>
+  <polygon points="-5,-4 6,0 -5,4" fill="#0d47a1">
+    <animateMotion dur="2.4s" rotate="auto" repeatCount="indefinite">
+      <mpath xlink:href="#track"/>
+    </animateMotion>
+  </polygon>
+  <text class="label" x="360" y="88" text-anchor="middle">animateMotion</text>
+</svg>

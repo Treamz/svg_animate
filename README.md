@@ -5,6 +5,15 @@ Plays SVGs that declare their own animation — SMIL (`<animate>`,
 the same `vector_graphics` renderer that
 [`flutter_svg`](https://pub.dev/packages/flutter_svg) draws still SVGs with.
 
+<!-- markdownlint-disable MD033 -->
+<img src="https://raw.githubusercontent.com/Treamz/svg_animate/main/doc/demo.svg"
+     width="440" alt="Four animated SVGs: a rotating spinner, a pulsing ring, a progress bar, and a marker following a path">
+<!-- markdownlint-enable MD033 -->
+
+*The image above is a single SVG file, animating in your browser exactly as it
+does in Flutter through this package. Its source is
+[`doc/demo.svg`](doc/demo.svg).*
+
 `AnimatedSvgPicture` is a drop-in companion to `SvgPicture`: it takes the same
 arguments for sizing, alignment, theming, color filtering, semantics and error
 handling, and reuses `flutter_svg`'s `SvgTheme`, `ColorMapper` and
