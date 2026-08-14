@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- A CSS @keyframes pulse. The ring scales about the center of the view box
+       and fades out, while the dot stays put. -->
+  <style>
+    .ring {
+      animation: pulse 1.8s ease-out infinite;
+      transform-origin: center;
+    }
+    @keyframes pulse {
+      from { transform: scale(0.4); opacity: 1 }
+      to { transform: scale(1); opacity: 0 }
+    }
+  </style>
+  <circle class="ring" cx="24" cy="24" r="20" fill="#42a5f5"/>
+  <circle cx="24" cy="24" r="7" fill="#0d47a1"/>
+</svg>

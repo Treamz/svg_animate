@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- `animateMotion` moves the dot along the dashed path, turning to face the
+       direction it is travelling. -->
+  <defs>
+    <path id="track" d="M8 24 C8 10 40 10 40 24 C40 38 8 38 8 24 Z"/>
+  </defs>
+  <use href="#track" fill="none" stroke="#e0e0e0" stroke-width="2" stroke-dasharray="3 3"/>
+  <polygon points="-5,-4 6,0 -5,4" fill="#0d47a1">
+    <animateMotion dur="3s" rotate="auto" repeatCount="indefinite">
+      <mpath href="#track"/>
+    </animateMotion>
+  </polygon>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 24" width="120" height="24">
+  <!-- Plays once and holds its final frame, thanks to `fill="freeze"`. -->
+  <rect x="2" y="8" width="116" height="8" rx="4" fill="#e0e0e0"/>
+  <rect x="2" y="8" width="0" height="8" rx="4" fill="#42a5f5">
+    <animate attributeName="width" from="0" to="116" dur="2s"
+        calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1" fill="freeze"/>
+  </rect>
+</svg>

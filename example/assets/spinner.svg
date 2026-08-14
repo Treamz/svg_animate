@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- A SMIL spinner: the arc rotates forever, and its color cycles. -->
+  <circle cx="24" cy="24" r="18" fill="none" stroke="#e0e0e0" stroke-width="5"/>
+  <path d="M24 6 A18 18 0 0 1 42 24" fill="none" stroke="#42a5f5" stroke-width="5"
+      stroke-linecap="round">
+    <animateTransform attributeName="transform" type="rotate"
+        from="0 24 24" to="360 24 24" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="stroke" values="#42a5f5;#0d47a1;#42a5f5" dur="2.4s"
+        repeatCount="indefinite"/>
+  </path>
+</svg>

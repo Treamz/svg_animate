@@ -1,0 +1,3 @@
+# Build output is never useful to consumers.
+build/
+example/build/
