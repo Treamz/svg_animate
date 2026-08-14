@@ -17,6 +17,12 @@ const Set<String> nonPresentationProperties = <String>{
   'animation-name',
   'animation-play-state',
   'animation-timing-function',
+  'offset',
+  'offset-anchor',
+  'offset-distance',
+  'offset-path',
+  'offset-position',
+  'offset-rotate',
   'transform-box',
   'transform-origin',
   'transition',
@@ -25,6 +31,23 @@ const Set<String> nonPresentationProperties = <String>{
   'transition-property',
   'transition-timing-function',
   'will-change',
+};
+
+/// Properties that may appear inside a `@keyframes` block but describe the
+/// animation rather than being animated by it.
+///
+/// Everything else in a keyframe is a value to animate, including properties
+/// such as `offset-distance` that are never written back as attributes.
+const Set<String> _keyframeControlProperties = <String>{
+  'animation',
+  'animation-delay',
+  'animation-direction',
+  'animation-duration',
+  'animation-fill-mode',
+  'animation-iteration-count',
+  'animation-name',
+  'animation-play-state',
+  'animation-timing-function',
 };
 
 const Set<String> _directionKeywords = <String>{
@@ -288,7 +311,7 @@ List<SvgAttributeAnimation> buildCssAnimations(
         stopCurves[offset] = parseCssTimingFunction(timingFunction);
       }
       for (final MapEntry<String, CssDeclaration> entry in keyframe.declarations.entries) {
-        if (nonPresentationProperties.contains(entry.key)) {
+        if (_keyframeControlProperties.contains(entry.key)) {
           continue;
         }
         (stops[entry.key] ??= <double, String>{})[offset] = entry.value.value;

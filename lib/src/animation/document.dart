@@ -3,6 +3,7 @@ import 'package:xml/xml.dart';
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
+import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
 import 'values.dart';
@@ -58,14 +59,30 @@ class AnimatedSvgDocument {
           origins[element] = origin;
         }
       }
+      final OffsetPath? offsetPath = OffsetPath.parse(declarations);
+      var movesAlongPath = false;
       for (final CssAnimationSpec spec in parseCssAnimationSpecs(declarations)) {
         for (final SvgAttributeAnimation animation in buildCssAnimations(
           spec,
           stylesheet,
           element.getAttribute,
         )) {
+          if (animation.attributeName == 'offset-distance') {
+            // Only meaningful with a path to walk along; without one the
+            // distance names nothing.
+            if (offsetPath != null) {
+              movesAlongPath = true;
+              animations.add(ParsedAnimation(element, offsetPath.toTransformAnimation(animation)));
+            }
+            continue;
+          }
           animations.add(ParsedAnimation(element, animation));
         }
+      }
+      if (offsetPath != null && !movesAlongPath) {
+        // The element sits at a fixed point on its path rather than travelling
+        // along it, which still has to be applied.
+        _prependTransform(element, offsetPath.transformFor(declarations['offset-distance']));
       }
     }
 
@@ -203,6 +220,16 @@ String _aboutOrigin(String transform, (double, double) origin) {
   final String negativeX = formatSvgNumber(-origin.$1);
   final String negativeY = formatSvgNumber(-origin.$2);
   return 'translate($x $y) $transform translate($negativeX $negativeY)';
+}
+
+/// Applies [transform] outside whatever transform [element] already has.
+void _prependTransform(XmlElement element, TransformListValue transform) {
+  final String? existing = element.getAttribute('transform');
+  final String text = transform.toAttributeValue();
+  element.setAttribute(
+    'transform',
+    existing == null || existing.trim().isEmpty ? text : '$text $existing',
+  );
 }
 
 CssStylesheet _extractStylesheet(XmlDocument document) {
