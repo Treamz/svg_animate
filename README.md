@@ -94,10 +94,13 @@ finishes.
 - Interpolation of numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`,
   and the SVG keywords), number lists, and transform lists.
 
-This package also resolves the CSS in a `<style>` element into presentation
-attributes, which is what makes stylesheet-driven SVGs render at all — the
-`vector_graphics` compiler does not implement CSS selectors, and `SvgPicture`
-ignores `<style>` entirely.
+This package also works around two things the renderer underneath cannot do on
+its own. It resolves the CSS in a `<style>` element into presentation
+attributes, which is what makes stylesheet-driven SVGs render at all, since the
+`vector_graphics` compiler does not implement CSS selectors. And it expands a
+`<use>` that points at an `<image>` into the image itself, because the renderer
+loses the image's size through a reference and then fails the whole picture
+rather than that one element.
 
 ### What is not supported
 
@@ -127,6 +130,10 @@ so drawing one costs the same as drawing a still SVG.
 
 The trade-off is loading: compiling *N* frames takes roughly *N* times as long
 as loading a still SVG, and the frames stay in memory while they are cached.
+Watch out for SVGs with embedded raster images: the image data is repeated in
+every compiled frame, so a 450×450 banner with a few embedded photographs can
+reach tens of megabytes at the default frame rate. Lower `frameRate` for those,
+or reach for a renderer that does not pre-compile.
 
 - `frameRate` (default `60`) — frames compiled per second of animation.
 - `maxFrames` (default `300`) — ceiling; longer animations are sampled at a

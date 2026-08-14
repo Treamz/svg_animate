@@ -3,6 +3,7 @@ import 'package:xml/xml.dart';
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
+import 'expand_use.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
@@ -40,6 +41,8 @@ class AnimatedSvgDocument {
         elementsById.putIfAbsent(id, () => element);
       }
     }
+
+    expandImageUses(document, elementsById);
 
     final _ViewBox viewBox = _ViewBox.of(document.rootElement);
     final origins = <XmlElement, (double, double)>{};
