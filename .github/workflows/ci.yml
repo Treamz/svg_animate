@@ -57,6 +57,10 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      # The publish dry run refuses a dirty tree, so anything the tooling
+      # rewrote on its own has to be visible rather than merely fatal.
+      - name: Show what the tooling changed
+        run: git --no-pager diff
       # Catches anything that would fail the real publish: a malformed pubspec,
       # a missing licence, files that should not ship.
       - name: Publish dry run
