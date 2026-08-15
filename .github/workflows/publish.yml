@@ -6,6 +6,9 @@ name: Publish
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+  # For running a release again after one failed part way, without having to
+  # move or reissue the tag. Pick the tag in the ref dropdown.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,6 +27,12 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Check this is running from a tag
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::run this from a tag, not from $GITHUB_REF_NAME; pick one in the ref dropdown"
+            exit 1
+          fi
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
       - name: Analyze
