@@ -454,6 +454,13 @@ class TransformValue extends AnimatableValue {
   /// The arguments to the transform function.
   final List<double> parameters;
 
+  /// The same transform with arguments that leave everything where it was.
+  TransformValue toIdentity() => TransformValue(
+    type,
+    // Scaling is the one that does nothing at one rather than at zero.
+    List<double>.filled(parameters.length, type == 'scale' ? 1.0 : 0.0),
+  );
+
   /// The parameter list padded out to [length] so that values written with
   /// different arities, such as `rotate(0)` and `rotate(360 50 50)`, can be
   /// combined.
@@ -661,6 +668,16 @@ class TransformListValue extends AnimatableValue {
 
   /// The transform functions, outermost first.
   final List<TransformValue> transforms;
+
+  /// A list of the same shape that leaves everything where it was.
+  ///
+  /// Used as the value a `transform` animation starts from when the element has
+  /// none of its own, which is what CSS means by the initial `none`. It has to
+  /// keep the shape rather than being an empty list, or the two ends of the
+  /// animation would no longer be interpolable.
+  TransformListValue toIdentity() => TransformListValue(<TransformValue>[
+    for (final TransformValue transform in transforms) transform.toIdentity(),
+  ]);
 
   bool _matches(TransformListValue other) {
     if (other.transforms.length != transforms.length) {

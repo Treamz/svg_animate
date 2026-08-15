@@ -6,6 +6,7 @@ const Map<String, String> _assets = <String, String>{
   'assets/spinner.svg': 'SMIL: <animateTransform> and <animate>',
   'assets/pulse.svg': 'CSS: @keyframes with transform-origin',
   'assets/orbit.svg': 'SMIL: <animateMotion> along an <mpath>',
+  'assets/progress.svg': 'SMIL: <animateMotion> along an <mpath>',
 };
 
 void main() {
@@ -28,8 +29,8 @@ class AnimatedSvgExampleApp extends StatelessWidget {
           children: <Widget>[
             for (final MapEntry<String, String> asset in _assets.entries)
               _Sample(assetName: asset.key, description: asset.value),
-            const Divider(height: 48),
-            const _ControlledSample(),
+            // const Divider(height: 48),
+            // const _ControlledSample(),
           ],
         ),
       ),
@@ -45,10 +46,9 @@ class _Sample extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: AnimatedSvgPicture.asset(assetName, width: 48, height: 48),
-      title: Text(assetName.split('/').last),
-      subtitle: Text(description),
+    return Padding(
+      padding: EdgeInsetsGeometry.symmetric(vertical: 10),
+      child: AnimatedSvgPicture.asset(assetName, width: 80, height: 80),
     );
   }
 }

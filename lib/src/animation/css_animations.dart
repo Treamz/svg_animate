@@ -335,6 +335,44 @@ List<SvgAttributeAnimation> buildCssAnimations(
   return animations;
 }
 
+/// The value [property] has when the animation is not running.
+///
+/// That is what a `@keyframes` rule means by leaving 0% or 100% out, and
+/// getting it wrong is what makes `@keyframes spin { to { transform:
+/// rotate(360deg) } }` — the way nearly every CSS spinner is written — sit
+/// still: with nothing to start from, both ends of the animation say 360.
+///
+/// [declared] is the value at the end that was written, and is used for its
+/// shape, since a transform can only interpolate against one built the same way.
+AnimatableValue _outsideTheAnimation(String property, String? baseValue, AnimatableValue declared) {
+  if (baseValue != null) {
+    final AnimatableValue? parsed = property == 'transform'
+        ? TransformListValue.parse(baseValue)
+        : parseAnimatableValue(property, baseValue);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+  // No value of its own, so the property's initial value stands in.
+  if (declared is TransformListValue) {
+    return declared.toIdentity();
+  }
+  if (_opaqueByDefault.contains(property)) {
+    return const NumberListValue(<double>[1]);
+  }
+  // Nothing better to say than that it does not change.
+  return declared;
+}
+
+/// Properties whose initial value is 1 rather than 0, so that leaving out a
+/// keyframe means fully opaque rather than invisible.
+const Set<String> _opaqueByDefault = <String>{
+  'fill-opacity',
+  'opacity',
+  'stop-opacity',
+  'stroke-opacity',
+};
+
 SvgAttributeAnimation? _buildPropertyAnimation(
   String property,
   Map<double, String> stops,
@@ -347,28 +385,26 @@ SvgAttributeAnimation? _buildPropertyAnimation(
     return null;
   }
 
-  final rawValues = <String>[for (final double offset in offsets) stops[offset]!];
-  // A keyframe list that does not cover the whole range falls back to the value
-  // the element has outside the animation, or, failing that, holds the nearest
-  // declared value.
-  if (offsets.first > 0) {
-    offsets.insert(0, 0);
-    rawValues.insert(0, baseValue ?? rawValues.first);
-  }
-  if (offsets.last < 1) {
-    offsets.add(1);
-    rawValues.add(baseValue ?? rawValues.last);
-  }
-
   final values = <AnimatableValue>[];
-  for (final raw in rawValues) {
+  for (final double offset in offsets) {
     final AnimatableValue? value = property == 'transform'
-        ? TransformListValue.parse(raw)
-        : parseAnimatableValue(property, raw);
+        ? TransformListValue.parse(stops[offset]!)
+        : parseAnimatableValue(property, stops[offset]!);
     if (value == null) {
       return null;
     }
     values.add(value);
+  }
+
+  // A keyframe list that does not cover the whole range takes the end it left
+  // out from the value the property has outside the animation.
+  if (offsets.first > 0) {
+    offsets.insert(0, 0);
+    values.insert(0, _outsideTheAnimation(property, baseValue, values.first));
+  }
+  if (offsets.last < 1) {
+    offsets.add(1);
+    values.add(_outsideTheAnimation(property, baseValue, values.last));
   }
   if (values.length < 2) {
     return null;
