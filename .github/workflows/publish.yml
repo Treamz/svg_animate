@@ -1,0 +1,59 @@
+name: Publish
+
+# Publishing is driven by the tag, so that what reaches pub.dev is always a
+# commit that exists in the history under a name. pub.dev checks for itself
+# that the tag matches the version in the pubspec.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  contents: read
+
+jobs:
+  # Publishing is irreversible: a version can be retracted but never removed,
+  # and the name is claimed for good. Everything CI would have said gets said
+  # again here, against the exact commit being released.
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+      - run: flutter test
+      - name: Check the tag matches the pubspec version
+        run: |
+          version=$(grep '^version:' pubspec.yaml | cut -d' ' -f2)
+          tag=${GITHUB_REF_NAME#v}
+          if [ "$version" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match pubspec version $version"
+            exit 1
+          fi
+      - name: Check the CHANGELOG mentions this version
+        run: |
+          version=$(grep '^version:' pubspec.yaml | cut -d' ' -f2)
+          if ! grep -q "^## $version\$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## $version' section"
+            exit 1
+          fi
+
+  publish:
+    name: Publish to pub.dev
+    needs: verify
+    permissions:
+      # Lets the job mint the OIDC token pub.dev exchanges for publish rights.
+      # No credentials are stored in this repository.
+      id-token: write
+    # Names a GitHub environment, which is where a required reviewer can be
+    # added, and which pub.dev can be configured to insist on.
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      environment: pub.dev
