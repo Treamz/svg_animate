@@ -288,6 +288,70 @@ void main() {
       expect(attributeAt(document, const Duration(seconds: 1), 'a', 'opacity'), '0.5');
     });
 
+    test('starts a to-only keyframe list from where the property already was', () {
+      // How nearly every CSS spinner is written. With nothing to start from
+      // both ends would say 360 and it would sit still.
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a { animation: spin 4s linear infinite; }
+            @keyframes spin { to { transform: rotate(360deg) } }
+          </style>
+          <rect id="a" width="10" height="10"/>
+        '''),
+      );
+      expect(attributeAt(document, Duration.zero, 'a', 'transform'), 'rotate(0)');
+      expect(attributeAt(document, const Duration(seconds: 1), 'a', 'transform'), 'rotate(90)');
+    });
+
+    test('keeps the shape of the transform it has to stand in for', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a { animation: grow 4s linear infinite; }
+            @keyframes grow { to { transform: translateX(80px) scale(3) } }
+          </style>
+          <rect id="a" width="10" height="10"/>
+        '''),
+      );
+      // Translate starts at nothing and scale at one, each keeping the arity it
+      // was written with, so the two ends stay the same shape and can be
+      // interpolated at all.
+      expect(attributeAt(document, Duration.zero, 'a', 'transform'), 'translate(0 0) scale(1)');
+      expect(
+        attributeAt(document, const Duration(seconds: 2), 'a', 'transform'),
+        'translate(40 0) scale(2)',
+      );
+    });
+
+    test('prefers the transform the element carries over the initial value', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a { animation: spin 4s linear infinite; }
+            @keyframes spin { to { transform: rotate(360deg) } }
+          </style>
+          <rect id="a" transform="rotate(90)" width="10" height="10"/>
+        '''),
+      );
+      expect(attributeAt(document, Duration.zero, 'a', 'transform'), 'rotate(90)');
+      expect(attributeAt(document, const Duration(seconds: 2), 'a', 'transform'), 'rotate(225)');
+    });
+
+    test('treats a missing opacity as fully opaque rather than invisible', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a { animation: fade 4s linear infinite; }
+            @keyframes fade { to { opacity: 0 } }
+          </style>
+          <rect id="a" width="10" height="10"/>
+        '''),
+      );
+      expect(attributeAt(document, Duration.zero, 'a', 'opacity'), '1');
+      expect(attributeAt(document, const Duration(seconds: 2), 'a', 'opacity'), '0.5');
+    });
+
     test('never runs a paused animation', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''

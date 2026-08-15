@@ -1,5 +1,12 @@
 ## 0.3.1
 
+* Fixes a `@keyframes` rule that declares only `to` sitting still. The missing
+  end was filled in from the value the element carried, and an element that
+  carried none got the other keyframe instead, so both ends agreed and nothing
+  moved. It now falls back to the value the property has outside the animation:
+  no rotation for a transform, fully opaque for an opacity. This is how nearly
+  every CSS spinner is written — `@keyframes spin { to { transform:
+  rotate(360deg) } }` — so it did not turn.
 * Adds `compileAnimatedSvg`, which compiles an animation without showing it.
   `AnimatedSvgFrames` could report `frameCount` and `compiledByteSize` but there
   was no way to get hold of one, so an SVG that embeds raster images could not
