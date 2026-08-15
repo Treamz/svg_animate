@@ -1,6 +1,10 @@
 # svg_animate
 
 [![pub package](https://img.shields.io/pub/v/svg_animate.svg)](https://pub.dev/packages/svg_animate)
+[![pub points](https://img.shields.io/pub/points/svg_animate)](https://pub.dev/packages/svg_animate/score)
+[![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.38-blue)](https://flutter.dev)
+[![platform](https://img.shields.io/badge/platform-android%20%7C%20ios%20%7C%20macos%20%7C%20windows%20%7C%20linux%20%7C%20web-lightgrey)](https://pub.dev/packages/svg_animate)
 
 Plays SVGs that declare their own animation — SMIL (`<animate>`,
 `<animateTransform>`, `<animateMotion>`, `<set>`), CSS `@keyframes`, and CSS
@@ -36,7 +40,7 @@ for the parts of such files that do not survive.
 
 ```yaml
 dependencies:
-  svg_animate: ^0.3.0
+  svg_animate: ^0.3.1
 ```
 
 There are constructors for every source `flutter_svg` supports:
@@ -86,49 +90,84 @@ controller.seekTo(const Duration(milliseconds: 500));
 `AnimatedBuilder` to follow playback frame by frame, even before loading
 finishes.
 
-## What is supported
+## Supported SVG features
 
-- **SMIL**: `<animate>`, `<animateTransform>`, `<animateMotion>` (with `path`
-  and `<mpath>`), and `<set>`, including `values` / `keyTimes` / `keySplines`,
-  `from` / `to` / `by`, `calcMode` (`linear`, `discrete`, `paced`, `spline`),
-  `begin`, `dur`, `end`, `repeatCount`, `repeatDur`, `fill`, `additive`,
-  `accumulate`, and `href` targeting.
-- **CSS**: `@keyframes` in a `<style>` element, driven by the `animation`
-  shorthand or its longhand properties, with `transform-origin` resolved against
-  the view box.
-- **CSS motion paths**: `offset-path: path(...)` with an animated
-  `offset-distance` and `offset-rotate`, which is how SVGator and similar
-  editors express movement.
-- Interpolation of numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`,
-  and the SVG keywords), number lists, and transform lists.
+### Animation
 
-This package also works around two things the renderer underneath cannot do on
-its own. It resolves the CSS in a `<style>` element into presentation
-attributes, which is what makes stylesheet-driven SVGs render at all, since the
-`vector_graphics` compiler does not implement CSS selectors. And it expands a
-`<use>` that points at an `<image>` into the image itself, because the renderer
-loses the image's size through a reference and then fails the whole picture
-rather than that one element.
+| | |
+|---|---|
+| `<animate>` | `values` / `keyTimes` / `keySplines`, `from` / `to` / `by` |
+| `<animateTransform>` | `translate`, `scale`, `rotate`, `skewX`, `skewY` |
+| `<animateMotion>` | `path` and `<mpath>`, `rotate="auto"` / `auto-reverse` |
+| `<set>` | yes |
+| `calcMode` | `linear`, `discrete`, `paced`, `spline` |
+| Timing | `begin` (offsets), `dur`, `end`, `repeatCount`, `repeatDur`, `fill` |
+| Composition | `additive="sum"`, `accumulate="sum"` |
+| Targeting | `href` / `xlink:href`, or the parent element |
+| CSS `@keyframes` | `animation` shorthand and every longhand, per-keyframe `animation-timing-function` |
+| `animation-direction` | `normal`, `reverse`, `alternate`, `alternate-reverse` |
+| `animation-fill-mode` | `forwards` and `both` hold the last frame |
+| CSS motion paths | `offset-path: path(...)`, `offset-distance`, `offset-rotate` |
+| `transform-origin` | resolved against the view box |
+| Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists |
+
+### Drawing
+
+Everything is drawn by `vector_graphics`, so an animated SVG supports exactly
+what a still one does through `flutter_svg`: paths and shapes, linear and radial
+gradients, patterns, `clipPath`, `mask`, text, embedded raster images, and the
+fifteen CSS blend modes.
+
+Two things that a still SVG does *not* get are handled here, because the
+renderer cannot do them on its own:
+
+- **CSS in a `<style>` element** is resolved into presentation attributes. The
+  `vector_graphics` compiler implements no CSS selectors, so without this a
+  stylesheet-driven SVG renders unstyled. `SvgPicture` ignores `<style>`
+  entirely.
+- **A `<use>` pointing at an `<image>`** is expanded into the image. The
+  renderer loses an image's size through a reference and then fails the whole
+  picture rather than that one element.
 
 ### What is not supported
 
-Anything that needs a live, interactive document is ignored rather than guessed
-at: a `begin` that waits for an event or on another animation, and CSS
-pseudo-class selectors such as `:hover`. CSS custom properties and the `var()`
-values that reference them are left out, so an element keeps whatever
-presentation attribute it already had. `<script>` is not run. Interpolating the
-`d` attribute is not supported; those animations switch between values instead
-of morphing.
+| | why |
+|---|---|
+| `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect |
+| `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
+| Morphing the `d` attribute | those animations switch between values instead of interpolating |
+| `begin` on an event or another animation | there is no interactive document to fire it |
+| CSS pseudo-classes such as `:hover` | same |
+| CSS custom properties and `var()` | left alone, so the element keeps the presentation attribute it already had |
+| `<script>` | not run |
+| `@media`, `@supports` | skipped rather than guessed at |
 
-Filters are not supported at all, animated or otherwise, because the
-`vector_graphics` renderer underneath drops `<filter>` entirely. An SVG that
-relies on one still draws, just without the effect. The same renderer knows the
-fifteen CSS blend modes but not `plus-lighter`, which editors reach for when
-they want a glow.
+## How it compares
 
-If you need filters, path morphing, or `<script>`, look at
-[`full_svg_flutter`](https://pub.dev/packages/full_svg_flutter), which covers
-considerably more of the format at the cost of a heavier dependency set.
+This package deliberately covers less of SVG than the alternatives, and carries
+much less with it.
+
+- It renders through `vector_graphics`, the same renderer `flutter_svg` uses, so
+  animated and still SVGs in one app are drawn by the same code and share
+  `SvgTheme` and `ColorMapper`.
+- It adds two pure Dart packages, `xml` and `path_parsing`, both already in
+  `flutter_svg`'s own dependency tree. No JavaScript runtime, no native engine,
+  no FFI.
+- A frame costs what a still SVG costs to draw, because frames are compiled
+  ahead of time rather than evaluated as they are shown.
+
+Which to reach for:
+
+| | |
+|---|---|
+| **svg_animate** | Spinners, loaders, animated icons, exports from animation editors. You already use `flutter_svg` and want to keep the dependency list short. |
+| [**full_svg_flutter**](https://pub.dev/packages/full_svg_flutter) | You need filters, `d` morphing, or SVGs that carry `<script>`. It covers considerably more of the format, and bundles a QuickJS runtime and `woff2` to do it. |
+| [**anim_svg**](https://pub.dev/packages/anim_svg) | You would rather transpile to Lottie and render through the native thorvg engine. |
+| [**flutter_svg**](https://pub.dev/packages/flutter_svg) | The SVG does not animate. |
+| [**lottie**](https://pub.dev/packages/lottie), [**rive**](https://pub.dev/packages/rive) | The animation is authored in those formats to begin with. Both are far more capable than any SVG animation runtime, if you can choose the format. |
+
+What is written above about other packages comes from their descriptions and
+dependency lists, not from benchmarking them.
 
 ## How it works, and what it costs
 
@@ -150,8 +189,12 @@ of on every frame change. For a 450×450 banner carrying five embedded bitmaps
 that is 5.1 MB rather than 27.5 MB, and 1.5 ms rather than 6.8 ms to change
 frame — the same cost as an SVG that embeds nothing at all.
 
-`AnimatedSvgFrames` reports `frameCount` and `compiledByteSize`, so an animation
-can say what it costs rather than being guessed at.
+An animation can say what it costs rather than being guessed at:
+
+```dart
+final AnimatedSvgFrames frames = await compileAnimatedSvg(markup);
+debugPrint('${frames.frameCount} frames, ${frames.compiledByteSize} bytes');
+```
 
 - `frameRate` (default `60`) — frames compiled per second of animation.
 - `maxFrames` (default `300`) — ceiling; longer animations are sampled at a
