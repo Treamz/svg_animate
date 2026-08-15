@@ -1,3 +1,10 @@
+## 0.3.1
+
+* Adds `compileAnimatedSvg`, which compiles an animation without showing it.
+  `AnimatedSvgFrames` could report `frameCount` and `compiledByteSize` but there
+  was no way to get hold of one, so an SVG that embeds raster images could not
+  be measured before choosing a frame rate for it.
+
 ## 0.3.0
 
 * Stores what the compiled frames have in common once instead of in every frame.
