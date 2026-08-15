@@ -206,26 +206,11 @@ debugPrint('${frames.frameCount} frames, ${frames.compiledByteSize} bytes');
 On the web there are no isolates, so compilation runs on the main thread; prefer
 a lower `frameRate` for long animations there.
 
-## Releasing
+## Contributing
 
-Publishing runs from GitHub Actions and is driven by the tag, so what reaches
-pub.dev is always a commit that exists in the history under a name.
-
-1. Bump `version` in `pubspec.yaml` and add the matching `## x.y.z` section to
-   `CHANGELOG.md`.
-2. Merge that to `main`.
-3. Tag it and push the tag: `git tag v0.3.1 && git push origin v0.3.1`.
-
-The workflow re-runs formatting, analysis and the tests against the tagged
-commit, refuses to go on if the tag and the pubspec disagree or the CHANGELOG
-has nothing to say about the version, and then publishes.
-
-No credentials live in this repository. pub.dev is told to trust tags from this
-repository and hands out publish rights in exchange for a short-lived token
-GitHub mints for the run, which is set up under **Admin → Automated publishing**
-on the package page. The publishing job names a `pub.dev` GitHub environment, so
-a required reviewer can be added there to make releases need a second pair of
-eyes.
+Development setup and the release process are in
+[CONTRIBUTING.md](CONTRIBUTING.md). Releases are cut by pushing a `v0.0.0` tag;
+GitHub Actions verifies the tagged commit and publishes it.
 
 ## License
 
