@@ -1,3 +1,16 @@
+## 0.3.3
+
+* Shows the first frame while the rest are still being compiled, instead of a
+  placeholder. Compiling every frame of a long animation is what the wait
+  before it appears is made of, and the first frame alone is a fraction of that
+  work: a 450x450 banner with embedded bitmaps now puts a picture on screen
+  after 189 ms rather than 2.4 s, and starts moving once the rest arrive. The
+  extra pass costs about 8% more total work on that file. Pictures waiting on
+  the same animation share the first-frame pass between them, and an animation
+  that is already compiled skips it altogether.
+* Adds `AnimationCache`'s `[]` operator, which reports what is already compiled
+  without compiling anything.
+
 ## 0.3.2
 
 * Fixes a `@keyframes` rule that declares only `to` sitting still. The missing

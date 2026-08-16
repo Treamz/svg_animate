@@ -640,39 +640,37 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
     _loadGeneration += 1;
     final int generation = _loadGeneration;
     try {
+      final AnimatedSvgFrames? cached = svgAnimateCache[key];
+      if (cached != null) {
+        _adopt(cached, generation);
+        return;
+      }
+
       // Deliberately chained rather than awaited: loaders may complete
       // synchronously, and an `await` on a synchronous future would let a
       // parse failure escape the future chain rather than reporting it here.
-      final AnimatedSvgFrames frames = await svgAnimateCache.putIfAbsent(
-        key,
-        () => loader
-            .loadSvgSource(context)
-            .then(
-              (SvgSource source) => compileAnimatedSvgFrames(
-                source.xml,
-                theme: source.theme.toVgTheme(),
-                colorMapper: toVgColorMapper(source.colorMapper),
-                frameRate: widget.frameRate,
-                maxFrames: widget.maxFrames,
-                debugName: loader.toString(),
-              ),
-            ),
-      );
+      final SvgSource source = await loader.loadSvgSource(context);
       if (!mounted || generation != _loadGeneration) {
         return;
       }
-      if (identical(frames, _frames) && _error == null) {
-        // The reload resolved to the animation that is already playing, so it
-        // keeps playing rather than jumping back to its first frame.
+
+      // Compiling every frame of a long animation takes long enough to be worth
+      // waiting through a placeholder for, and the first frame alone takes a
+      // fraction of it. So it is compiled on its own and shown while the rest
+      // are still being worked out: the picture appears, then it starts moving.
+      final AnimatedSvgFrames poster = await _posterFor(key, source, loader);
+      if (!mounted || generation != _loadGeneration) {
         return;
       }
-      setState(() {
-        _error = null;
-        _stackTrace = null;
-        _frames = frames;
-        _frameIndex = 0;
-      });
-      _startPlayback(frames);
+      if (_frames == null) {
+        _adopt(poster, generation);
+      }
+
+      final AnimatedSvgFrames frames = await svgAnimateCache.putIfAbsent(
+        key,
+        () => _compile(source, loader, frameCap: widget.maxFrames),
+      );
+      _adopt(frames, generation);
     } catch (error, stackTrace) {
       if (!mounted || generation != _loadGeneration) {
         return;
@@ -683,6 +681,62 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
         _frames = null;
       });
     }
+  }
+
+  /// The compilations of a first frame that are in flight, so that several
+  /// pictures waiting on the same animation ask for it once between them.
+  ///
+  /// Short lived by nature: an entry lives only until the full animation
+  /// arrives, which is what everything waiting is really after.
+  static final Map<Object, Future<AnimatedSvgFrames>> _pendingPosters =
+      <Object, Future<AnimatedSvgFrames>>{};
+
+  Future<AnimatedSvgFrames> _posterFor(
+    Object key,
+    SvgSource source,
+    SvgSourceLoader<Object?> loader,
+  ) {
+    final Future<AnimatedSvgFrames>? pending = _pendingPosters[key];
+    if (pending != null) {
+      return pending;
+    }
+    final Future<AnimatedSvgFrames> poster = _compile(source, loader, frameCap: 1);
+    _pendingPosters[key] = poster;
+    return poster.whenComplete(() => _pendingPosters.remove(key));
+  }
+
+  Future<AnimatedSvgFrames> _compile(
+    SvgSource source,
+    SvgSourceLoader<Object?> loader, {
+    required int frameCap,
+  }) {
+    return compileAnimatedSvgFrames(
+      source.xml,
+      theme: source.theme.toVgTheme(),
+      colorMapper: toVgColorMapper(source.colorMapper),
+      frameRate: widget.frameRate,
+      maxFrames: frameCap,
+      debugName: loader.toString(),
+    );
+  }
+
+  /// Shows [frames], and starts them playing if there is anything to play.
+  void _adopt(AnimatedSvgFrames frames, int generation) {
+    if (!mounted || generation != _loadGeneration) {
+      return;
+    }
+    if (identical(frames, _frames) && _error == null) {
+      // The reload resolved to the animation that is already playing, so it
+      // keeps playing rather than jumping back to its first frame.
+      return;
+    }
+    setState(() {
+      _error = null;
+      _stackTrace = null;
+      _frames = frames;
+      _frameIndex = 0;
+    });
+    _startPlayback(frames);
   }
 
   bool _repeats(AnimatedSvgFrames frames) => widget.repeat ?? frames.loops;

@@ -154,6 +154,25 @@ void main() {
     expect(find.byType(VectorGraphic), findsOneWidget);
   });
 
+  testWidgets('skips the first-frame pass when the animation is already cached', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+    );
+    await tester.pump();
+    expect(_frameLoader(tester).frames.frameCount, 4);
+
+    // A second widget on the same animation has nothing to wait for, so it must
+    // not flash a single frame on the way.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(
+      AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+    );
+    await tester.pump();
+    expect(_frameLoader(tester).frames.frameCount, 4);
+  });
+
   testWidgets('reports malformed markup through the error builder', (WidgetTester tester) async {
     await tester.pumpWidget(
       AnimatedSvgPicture.string(

@@ -44,6 +44,19 @@ class AnimationCache {
     _cache.clear();
   }
 
+  /// The animation cached under [key], if it is there.
+  ///
+  /// Unlike [putIfAbsent] this compiles nothing, so a caller can tell whether
+  /// the expensive work has already been done before deciding to do anything
+  /// about the wait.
+  AnimatedSvgFrames? operator [](Object key) {
+    final AnimatedSvgFrames? cached = _cache.remove(key);
+    if (cached != null) {
+      _add(key, cached); // Reading counts as use.
+    }
+    return cached;
+  }
+
   /// Evicts a single entry from the cache, returning true if successful.
   bool evict(Object key) {
     return _cache.remove(key) != null;
