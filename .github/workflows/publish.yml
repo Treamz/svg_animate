@@ -53,6 +53,19 @@ jobs:
             echo "::error::CHANGELOG.md has no '## $version' section"
             exit 1
           fi
+      # A version number is spent for good the first time it is published, so
+      # the second attempt on one is always a mistake: either the bump was
+      # missed, or a branch cut before an earlier release carried its number
+      # forward. Both look entirely consistent from inside the repository —
+      # pubspec and CHANGELOG agree with each other and with the tag — and only
+      # pub.dev knows the number is gone.
+      - name: Check the version is not already published
+        run: |
+          version=$(grep '^version:' pubspec.yaml | cut -d' ' -f2)
+          if curl -sf -o /dev/null "https://pub.dev/api/packages/svg_animate/versions/$version"; then
+            echo "::error::$version is already on pub.dev; raise the version in pubspec.yaml and give it its own CHANGELOG section, leaving the published one as it stands"
+            exit 1
+          fi
 
   publish:
     name: Publish to pub.dev

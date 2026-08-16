@@ -1,0 +1,99 @@
+name: Release
+
+# Prepares a release: works out the next version, gives the accumulated
+# `## Unreleased` notes that number, and opens a pull request carrying just
+# those two edits. Publishing still happens on the tag, so that the irreversible
+# step stays a deliberate act by a person rather than a side effect of merging.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which part of the version to raise (below 1.0.0 a breaking change takes `minor`)'
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Prepare the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+
+      - name: Work out the next version
+        id: version
+        run: |
+          current=$(grep '^version:' pubspec.yaml | cut -d' ' -f2)
+          IFS=. read -r major minor patch <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "raising $current to $next" >> "$GITHUB_STEP_SUMMARY"
+
+      # Releasing nothing still spends a version number, and a release with an
+      # empty CHANGELOG section cannot be explained after the fact.
+      - name: Check there is something to release
+        run: |
+          if ! grep -q '^## Unreleased$' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## Unreleased' section, so nothing has been written down to release"
+            exit 1
+          fi
+
+      - name: Check the version is free
+        run: |
+          if curl -sf -o /dev/null "https://pub.dev/api/packages/svg_animate/versions/${{ steps.version.outputs.next }}"; then
+            echo "::error::${{ steps.version.outputs.next }} is already on pub.dev, so pubspec.yaml on main is behind what has been released"
+            exit 1
+          fi
+
+      - name: Give the notes their version
+        run: |
+          next='${{ steps.version.outputs.next }}'
+          sed -i "s/^## Unreleased$/## $next/" CHANGELOG.md
+          sed -i "s/^version: .*/version: $next/" pubspec.yaml
+          git --no-pager diff
+
+      - name: Open the release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.version.outputs.next }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "release/v$NEXT"
+          git commit -am "Release $NEXT"
+          git push origin "release/v$NEXT"
+          # Written to a file rather than inlined: a here-document inside a
+          # command substitution is the one shell construction bash 3.2 cannot
+          # parse, which puts the workflow beyond checking on a Mac.
+          cat > "$RUNNER_TEMP/pr-body.md" <<BODY
+          Raises the version to \`$NEXT\` and gives the \`## Unreleased\` notes that number. No other change.
+
+          Nothing in this pull request was written by hand, so there is nothing to review but the notes themselves. Read the $NEXT section of \`CHANGELOG.md\` as someone who will only ever see this version through it. Then merge, and publish by tagging the merge commit:
+
+          \`\`\`sh
+          git switch main && git pull
+          git tag v$NEXT
+          git push origin v$NEXT
+          \`\`\`
+
+          That starts \`Publish\`, which re-runs formatting, analysis and the tests against the tagged commit, checks the tag against the pubspec, checks the CHANGELOG has this section and checks the version is still free on pub.dev, and only then publishes.
+
+          CI does not run on this pull request: a run opened with the workflow's own token cannot start another workflow. The \`Publish\` run on the tag covers the same ground against the same commit.
+          BODY
+          gh pr create \
+            --base main \
+            --head "release/v$NEXT" \
+            --title "Release $NEXT" \
+            --body-file "$RUNNER_TEMP/pr-body.md"

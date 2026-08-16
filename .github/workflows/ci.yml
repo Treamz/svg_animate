@@ -31,6 +31,35 @@ jobs:
       - name: Analyze
         run: flutter analyze --fatal-infos
 
+  # A change to the package that nobody wrote down reaches pub.dev as an
+  # unexplained difference in behaviour, and the moment to explain it is while
+  # the reason is still in front of whoever made it. Put `## Unreleased` at the
+  # top of CHANGELOG.md and write there; the release picks the version number
+  # up later, so a pull request never has to guess one.
+  changelog:
+    name: Changelog
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The comparison needs both ends of the pull request, not just its tip.
+          fetch-depth: 0
+      - name: Check the change is written down
+        # Refactors, test-only work and anything else with nothing to say to a
+        # user get out of this by carrying the `skip changelog` label.
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip changelog') }}
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+          if echo "$changed" | grep -q '^lib/' &&
+             ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
+            echo "::error::this changes lib/ but says nothing in CHANGELOG.md; write it under '## Unreleased', or add the 'skip changelog' label if there is genuinely nothing for a user to read"
+            exit 1
+          fi
+
   test:
     name: Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
