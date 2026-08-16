@@ -1,3 +1,16 @@
+## Unreleased
+
+* Bounds the animation cache by how much it is holding and not only by how many
+  animations it holds, through `AnimationCache.maximumSizeBytes`, which defaults
+  to 20 MiB. The count was the only limit, and how much an animation costs to
+  hold has very little to do with how many there are: a spinner compiles to a
+  few kilobytes and a banner carrying embedded bitmaps to several megabytes, so
+  the default of ten entries was somewhere between 50 KB and 50 MB depending
+  entirely on what an app happened to show. An animation larger than the whole
+  budget is still kept, alone, rather than refused — refusing it would disable
+  the cache for exactly the files whose recompilation is measured in seconds.
+  `AnimationCache.currentSizeBytes` reports what is held.
+
 ## 0.3.3
 
 * Shows the first frame while the rest are still being compiled, instead of a
