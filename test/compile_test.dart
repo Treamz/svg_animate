@@ -33,6 +33,22 @@ void main() {
     expect(frames.isAnimated, isFalse);
   });
 
+  test('compiles a single frame that still knows the whole animation', () async {
+    // What a picture shows while the rest of its frames are still being
+    // compiled. It has to carry the real duration and loop flag, since those
+    // decide how the full animation will be played once it arrives.
+    final AnimatedSvgFrames poster = await compileAnimatedSvg(_spinner, maxFrames: 1);
+
+    expect(poster.frameCount, 1);
+    expect(poster.duration, const Duration(seconds: 1));
+    expect(poster.loops, isTrue);
+    expect(poster.isAnimated, isFalse, reason: 'one frame cannot be played');
+
+    // It is the animation at time zero, not some other frame of it.
+    final AnimatedSvgFrames full = await compileAnimatedSvg(_spinner, frameRate: 4);
+    expect(poster.frameAt(0).buffer.asUint8List(), full.frameAt(0).buffer.asUint8List());
+  });
+
   test('honors the frame rate and the ceiling on frames', () async {
     expect((await compileAnimatedSvg(_spinner, frameRate: 20)).frameCount, 20);
     expect((await compileAnimatedSvg(_spinner, frameRate: 20, maxFrames: 5)).frameCount, 5);
