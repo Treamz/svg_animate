@@ -1,4 +1,4 @@
-## 0.3.2
+## 0.3.3
 
 * Shows the first frame while the rest are still being compiled, instead of a
   placeholder. Compiling every frame of a long animation is what the wait
@@ -10,6 +10,9 @@
   that is already compiled skips it altogether.
 * Adds `AnimationCache`'s `[]` operator, which reports what is already compiled
   without compiling anything.
+
+## 0.3.2
+
 * Fixes a `@keyframes` rule that declares only `to` sitting still. The missing
   end was filled in from the value the element carried, and an element that
   carried none got the other keyframe instead, so both ends agreed and nothing
