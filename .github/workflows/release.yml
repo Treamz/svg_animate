@@ -1,9 +1,15 @@
 name: Release
 
 # Prepares a release: works out the next version, gives the accumulated
-# `## Unreleased` notes that number, and opens a pull request carrying just
-# those two edits. Publishing still happens on the tag, so that the irreversible
-# step stays a deliberate act by a person rather than a side effect of merging.
+# `## Unreleased` notes that number, and pushes a branch carrying just those two
+# edits, then links to the pull request for them.
+#
+# It stops short of opening that pull request itself, which is not a limitation
+# but the point. A pull request opened with a workflow's own token cannot start
+# another workflow, so the release commit — the one commit that reaches pub.dev
+# under a name — would be the only commit in the repository to arrive with no CI
+# on it at all. Opening it by hand is one click and buys back every check.
+# It also means this workflow needs no permission to create pull requests.
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +21,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   prepare:
@@ -39,7 +44,6 @@ jobs:
           next="$major.$minor.$patch"
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "next=$next" >> "$GITHUB_OUTPUT"
-          echo "raising $current to $next" >> "$GITHUB_STEP_SUMMARY"
 
       # Releasing nothing still spends a version number, and a release with an
       # empty CHANGELOG section cannot be explained after the fact.
@@ -51,22 +55,25 @@ jobs:
           fi
 
       - name: Check the version is free
+        env:
+          NEXT: ${{ steps.version.outputs.next }}
         run: |
-          if curl -sf -o /dev/null "https://pub.dev/api/packages/svg_animate/versions/${{ steps.version.outputs.next }}"; then
-            echo "::error::${{ steps.version.outputs.next }} is already on pub.dev, so pubspec.yaml on main is behind what has been released"
+          if curl -sf -o /dev/null "https://pub.dev/api/packages/svg_animate/versions/$NEXT"; then
+            echo "::error::$NEXT is already on pub.dev, so pubspec.yaml on main is behind what has been released"
             exit 1
           fi
 
       - name: Give the notes their version
+        env:
+          NEXT: ${{ steps.version.outputs.next }}
         run: |
-          next='${{ steps.version.outputs.next }}'
-          sed -i "s/^## Unreleased$/## $next/" CHANGELOG.md
-          sed -i "s/^version: .*/version: $next/" pubspec.yaml
+          sed -i "s/^## Unreleased$/## $NEXT/" CHANGELOG.md
+          sed -i "s/^version: .*/version: $NEXT/" pubspec.yaml
           git --no-pager diff
 
-      - name: Open the release pull request
+      - name: Push the release branch
         env:
-          GH_TOKEN: ${{ github.token }}
+          CURRENT: ${{ steps.version.outputs.current }}
           NEXT: ${{ steps.version.outputs.next }}
         run: |
           git config user.name 'github-actions[bot]'
@@ -74,13 +81,18 @@ jobs:
           git switch -c "release/v$NEXT"
           git commit -am "Release $NEXT"
           git push origin "release/v$NEXT"
-          # Written to a file rather than inlined: a here-document inside a
-          # command substitution is the one shell construction bash 3.2 cannot
-          # parse, which puts the workflow beyond checking on a Mac.
-          cat > "$RUNNER_TEMP/pr-body.md" <<BODY
-          Raises the version to \`$NEXT\` and gives the \`## Unreleased\` notes that number. No other change.
 
-          Nothing in this pull request was written by hand, so there is nothing to review but the notes themselves. Read the $NEXT section of \`CHANGELOG.md\` as someone who will only ever see this version through it. Then merge, and publish by tagging the merge commit:
+          compare="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...release/v$NEXT?expand=1"
+          # Written to the run summary rather than only to the log, so that the
+          # link is the first thing on the page the run finishes on.
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Release $NEXT
+
+          Raised from \`$CURRENT\`. The branch \`release/v$NEXT\` carries the version bump and the renamed \`## Unreleased\` heading, and nothing else.
+
+          **[Open the pull request]($compare)**
+
+          Nothing on it was written by hand, so there is nothing to review but the notes themselves. Read the $NEXT section of \`CHANGELOG.md\` as someone who will only ever see this version through it. Then let CI finish, merge, and publish by tagging the merge commit:
 
           \`\`\`sh
           git switch main && git pull
@@ -89,11 +101,5 @@ jobs:
           \`\`\`
 
           That starts \`Publish\`, which re-runs formatting, analysis and the tests against the tagged commit, checks the tag against the pubspec, checks the CHANGELOG has this section and checks the version is still free on pub.dev, and only then publishes.
-
-          CI does not run on this pull request: a run opened with the workflow's own token cannot start another workflow. The \`Publish\` run on the tag covers the same ground against the same commit.
-          BODY
-          gh pr create \
-            --base main \
-            --head "release/v$NEXT" \
-            --title "Release $NEXT" \
-            --body-file "$RUNNER_TEMP/pr-body.md"
+          SUMMARY
+          echo "::notice title=Release $NEXT prepared::open the pull request at $compare"

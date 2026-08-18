@@ -55,17 +55,23 @@ number to the release removes the guess rather than checking it.
    change is spelled.
 
    It works out the next version, renames `## Unreleased` to it, bumps the
-   pubspec and opens a pull request with those two edits and nothing else. It
+   pubspec, and pushes a branch carrying those two edits and nothing else. It
    refuses to run if there is no `## Unreleased` section, or if the version it
    arrived at is somehow already on pub.dev.
 
-2. Read the new section as someone who will only ever see this version through
-   it, then merge. There is nothing else in the pull request to review, and no
-   CI on it: a run opened with the workflow's own token cannot start another
-   workflow, and the `Publish` run below covers the same ground against the same
-   commit.
+2. Open the pull request from the link in the run summary, and let CI finish.
 
-3. Tag the merge commit and push the tag:
+   The workflow deliberately does not open it. A pull request opened with a
+   workflow's own token cannot start another workflow, so the release commit —
+   the one commit that reaches pub.dev under a name — would be the only commit
+   in the repository to arrive with nothing having checked it. One click buys
+   back every check, and the workflow needs no permission to create pull
+   requests.
+
+3. Read the new section as someone who will only ever see this version through
+   it, then merge. There is nothing else in the pull request to review.
+
+4. Tag the merge commit and push the tag:
 
    ```sh
    git switch main && git pull
@@ -87,6 +93,7 @@ is still free on pub.dev, and only then publishes.
 | what happened | what to do |
 |---|---|
 | `Release` said there was nothing to release | No pull request since the last release wrote under `## Unreleased`. If something should have, add the section and say what changed. |
+| You changed your mind before merging | Delete the `release/v0.3.3` branch. `main` still says `## Unreleased`, because the renaming only ever happened on the branch, so nothing needs undoing. |
 | `verify` failed | Nothing was published. Fix it on `main`, then `git tag -d v0.3.3 && git push origin :v0.3.3` and tag again. |
 | Publishing failed after `verify` passed | Run the `Publish` workflow again from the Actions tab, picking the tag in the ref dropdown. The tag does not need to be moved or reissued. |
 | The version is on pub.dev and is wrong | It cannot be removed. It can be **retracted** within seven days, from **Admin → Retract package version** on the package page, which stops new dependants resolving to it without breaking those that already did. Then release a fixed version. |
