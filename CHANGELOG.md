@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.5
 
 * Keeps one copy of any frame that repeats, rather than one per sampling point.
   Frames repeat whenever the document holds still — a `<set>`, a discrete
