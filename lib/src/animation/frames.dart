@@ -33,12 +33,15 @@ class AnimatedSvgFrames {
   const AnimatedSvgFrames._({
     required Uint8List shared,
     required List<Uint8List> tails,
+    required List<int>? storage,
     required this.duration,
     required this.loops,
   }) : _shared = shared,
-       _tails = tails;
+       _tails = tails,
+       _storage = storage;
 
-  /// Splits [frames] into the part they all share and what remains of each.
+  /// Splits [frames] into the part they all share and what remains of each,
+  /// keeping only one copy of any frame that repeats.
   factory AnimatedSvgFrames.fromEncodedFrames(
     List<Uint8List> frames, {
     required Duration duration,
@@ -46,16 +49,24 @@ class AnimatedSvgFrames {
   }) {
     assert(frames.isNotEmpty);
     final int shared = _sharedPrefixLength(frames);
+    final tails = <Uint8List>[for (final Uint8List frame in frames) frame.sublist(shared)];
+    final _DistinctTails distinct = _distinctTails(tails);
     return AnimatedSvgFrames._(
       shared: frames.first.sublist(0, shared),
-      tails: <Uint8List>[for (final Uint8List frame in frames) frame.sublist(shared)],
+      tails: distinct.tails,
+      storage: distinct.storage,
       duration: duration,
       loops: loops,
     );
   }
 
   final Uint8List _shared;
+
+  /// The distinct frames, in the order they are first sampled.
   final List<Uint8List> _tails;
+
+  /// Which of [_tails] each sampled frame shows, or null when they all differ.
+  final List<int>? _storage;
 
   /// How long one pass through the frames takes.
   final Duration duration;
@@ -63,10 +74,20 @@ class AnimatedSvgFrames {
   /// Whether playback should restart after the last frame.
   final bool loops;
 
-  /// How many frames the animation was compiled into.
+  /// How many frames the animation was sampled at.
   ///
-  /// Always at least one; an SVG with no animation compiles to a single frame.
-  int get frameCount => _tails.length;
+  /// This is the resolution of the timeline rather than the number of pictures
+  /// held: frames that came out of the compiler identical are stored once, so
+  /// this can be larger than [distinctFrameCount]. Always at least one; an SVG
+  /// with no animation compiles to a single frame.
+  int get frameCount => _storage?.length ?? _tails.length;
+
+  /// How many of the sampled frames actually differ from one another.
+  ///
+  /// A document that declares an animation the renderer cannot express — a
+  /// morphing `d`, say — samples to any number of frames that are all the same
+  /// picture, and reports one here.
+  int get distinctFrameCount => _tails.length;
 
   /// How much memory the compiled frames occupy, in bytes.
   ///
@@ -75,14 +96,18 @@ class AnimatedSvgFrames {
       _shared.length + _tails.fold(0, (int total, Uint8List tail) => total + tail.length);
 
   /// Whether there is anything to play.
-  bool get isAnimated => frameCount > 1 && duration > Duration.zero;
+  ///
+  /// Counts pictures rather than sampling points, so an animation that never
+  /// changes what it draws is not played: there is nothing for a ticker to do
+  /// but repaint the same picture until the widget goes away.
+  bool get isAnimated => distinctFrameCount > 1 && duration > Duration.zero;
 
   /// The encoded vector graphic for the frame at [index].
   ///
   /// Rebuilt on each call from the shared part and the frame's own, which costs
   /// a copy of a few tens of kilobytes and saves holding every frame whole.
   ByteData frameAt(int index) {
-    final Uint8List tail = _tails[index];
+    final Uint8List tail = _tails[_storageIndexAt(index)];
     if (_shared.isEmpty) {
       return tail.buffer.asByteData(tail.offsetInBytes, tail.lengthInBytes);
     }
@@ -105,6 +130,85 @@ class AnimatedSvgFrames {
     }
     return (progress.clamp(0.0, 1.0) * (frameCount - 1)).round();
   }
+
+  /// Which stored picture the frame at [index] shows.
+  ///
+  /// Two frames that resolve to the same picture are the same picture, which is
+  /// what lets playback skip decoding one it is already showing.
+  int _storageIndexAt(int index) => _storage?[index] ?? index;
+}
+
+/// The distinct entries of a list of frame tails, and where each frame found
+/// its own.
+class _DistinctTails {
+  const _DistinctTails(this.tails, this.storage);
+
+  final List<Uint8List> tails;
+
+  /// Null when nothing repeated, so that the common case carries no table.
+  final List<int>? storage;
+}
+
+/// Keeps one copy of each distinct entry of [tails].
+///
+/// Frames repeat whenever the document holds still: a `<set>`, a discrete
+/// `calcMode`, a CSS `steps()` timing function, or simply a long gap between
+/// keyframes all sample to the same picture many times over. So does an
+/// animation of something the renderer cannot draw, which samples to nothing
+/// but copies of one frame.
+_DistinctTails _distinctTails(List<Uint8List> tails) {
+  if (tails.length == 1) {
+    return _DistinctTails(tails, null);
+  }
+  // Digests first, because comparing every frame against every distinct one it
+  // is not equal to would cost the square of the frame count in byte
+  // comparisons. A collision costs one comparison that fails; equality is never
+  // concluded from the digest alone.
+  final buckets = <int, List<int>>{};
+  final distinct = <Uint8List>[];
+  final storage = List<int>.filled(tails.length, 0);
+  for (var index = 0; index < tails.length; index += 1) {
+    final Uint8List tail = tails[index];
+    final List<int> bucket = buckets.putIfAbsent(_digest(tail), () => <int>[]);
+    var found = -1;
+    for (final int candidate in bucket) {
+      if (_sameBytes(distinct[candidate], tail)) {
+        found = candidate;
+        break;
+      }
+    }
+    if (found < 0) {
+      found = distinct.length;
+      distinct.add(tail);
+      bucket.add(found);
+    }
+    storage[index] = found;
+  }
+  if (distinct.length == tails.length) {
+    return _DistinctTails(tails, null);
+  }
+  return _DistinctTails(distinct, storage);
+}
+
+/// An FNV-1a digest of [bytes], masked to stay a small integer everywhere.
+int _digest(Uint8List bytes) {
+  var hash = 0x811c9dc5;
+  for (var i = 0; i < bytes.length; i += 1) {
+    hash = ((hash ^ bytes[i]) * 0x01000193) & 0x3fffffff;
+  }
+  return hash ^ bytes.length;
+}
+
+bool _sameBytes(Uint8List a, Uint8List b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i += 1) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// The length of the longest run of bytes every one of [frames] starts with.
@@ -208,14 +312,19 @@ class AnimatedSvgFrameLoader extends BytesLoader {
   Future<ByteData> loadBytes(BuildContext? context) =>
       SynchronousFuture<ByteData>(frames.frameAt(frameIndex));
 
+  // Both of these speak in stored pictures rather than in frame numbers, so
+  // that a run of frames the compiler produced identically is recognised as the
+  // one picture it is: the widget then neither reloads it nor caches it twice
+  // while the animation sits on it.
   @override
-  Object cacheKey(BuildContext? context) => _AnimatedSvgFrameKey(frames, frameIndex);
+  Object cacheKey(BuildContext? context) =>
+      _AnimatedSvgFrameKey(frames, frames._storageIndexAt(frameIndex));
 
   @override
   bool operator ==(Object other) =>
       other is AnimatedSvgFrameLoader &&
       identical(other.frames, frames) &&
-      other.frameIndex == frameIndex;
+      frames._storageIndexAt(other.frameIndex) == frames._storageIndexAt(frameIndex);
 
   // Deliberately the same for every frame of one animation, even though the
   // frames are not equal to each other. The renderer namespaces its image cache
@@ -235,6 +344,8 @@ class _AnimatedSvgFrameKey {
   const _AnimatedSvgFrameKey(this.frames, this.frameIndex);
 
   final AnimatedSvgFrames frames;
+
+  /// An index into the stored pictures, not into the frames.
   final int frameIndex;
 
   @override
