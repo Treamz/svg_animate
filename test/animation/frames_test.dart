@@ -42,6 +42,88 @@ void main() {
       expect(frames.compiledByteSize, 1003);
     });
 
+    test('stores a frame that repeats only once', () {
+      final List<Uint8List> compiled = <Uint8List>[
+        frame(<int>[1, 2], <int>[9]),
+        frame(<int>[1, 2], <int>[8]),
+        frame(<int>[1, 2], <int>[9]),
+        frame(<int>[1, 2], <int>[8]),
+      ];
+      final AnimatedSvgFrames frames = AnimatedSvgFrames.fromEncodedFrames(
+        compiled,
+        duration: const Duration(seconds: 1),
+        loops: true,
+      );
+
+      expect(frames.frameCount, 4, reason: 'the timeline keeps its resolution');
+      expect(frames.distinctFrameCount, 2);
+      // Two shared bytes plus one byte for each of the two distinct frames.
+      expect(frames.compiledByteSize, 4);
+      for (var i = 0; i < compiled.length; i += 1) {
+        expect(frames.frameAt(i).buffer.asUint8List(), compiled[i], reason: 'frame $i');
+      }
+    });
+
+    test('is not animated when every frame draws the same picture', () {
+      final AnimatedSvgFrames frames = AnimatedSvgFrames.fromEncodedFrames(
+        <Uint8List>[
+          for (var i = 0; i < 60; i += 1) Uint8List.fromList(<int>[1, 2, 3]),
+        ],
+        duration: const Duration(seconds: 1),
+        loops: true,
+      );
+
+      expect(frames.frameCount, 60);
+      expect(frames.distinctFrameCount, 1);
+      expect(frames.compiledByteSize, 3, reason: 'held once, not sixty times');
+      expect(
+        frames.isAnimated,
+        isFalse,
+        reason: 'there is nothing for a ticker to do but repaint one picture',
+      );
+    });
+
+    test('leaves an animation whose frames all differ untouched', () {
+      final List<Uint8List> compiled = <Uint8List>[
+        frame(<int>[7, 7], <int>[1]),
+        frame(<int>[7, 7], <int>[2]),
+        frame(<int>[7, 7], <int>[3]),
+      ];
+      final AnimatedSvgFrames frames = AnimatedSvgFrames.fromEncodedFrames(
+        compiled,
+        duration: const Duration(seconds: 1),
+        loops: true,
+      );
+
+      expect(frames.frameCount, 3);
+      expect(frames.distinctFrameCount, 3);
+      expect(frames.isAnimated, isTrue);
+      for (var i = 0; i < compiled.length; i += 1) {
+        expect(frames.frameAt(i).buffer.asUint8List(), compiled[i], reason: 'frame $i');
+      }
+    });
+
+    test('tells frames showing one picture apart from frames showing two', () {
+      final AnimatedSvgFrames repeating = AnimatedSvgFrames.fromEncodedFrames(
+        <Uint8List>[
+          Uint8List.fromList(<int>[1]),
+          Uint8List.fromList(<int>[2]),
+          Uint8List.fromList(<int>[1]),
+        ],
+        duration: const Duration(seconds: 1),
+        loops: true,
+      );
+
+      // The widget hands the renderer one of these per frame; equal ones let it
+      // keep the picture it has already decoded.
+      expect(
+        AnimatedSvgFrameLoader(repeating, 0) == AnimatedSvgFrameLoader(repeating, 2),
+        isTrue,
+        reason: 'frames 0 and 2 are the same picture',
+      );
+      expect(AnimatedSvgFrameLoader(repeating, 0) == AnimatedSvgFrameLoader(repeating, 1), isFalse);
+    });
+
     test('costs nothing when the frames share nothing', () {
       final List<Uint8List> compiled = <Uint8List>[
         Uint8List.fromList(<int>[1, 1, 1]),

@@ -1,3 +1,22 @@
+## Unreleased
+
+* Keeps one copy of any frame that repeats, rather than one per sampling point.
+  Frames repeat whenever the document holds still — a `<set>`, a discrete
+  `calcMode`, a CSS `steps()` timing function, a long gap between keyframes — so
+  a one-second blink compiled at the default frame rate held sixty pictures
+  where it draws two, and a `steps(4)` slide held sixty where it draws four.
+  Nothing changes for an animation whose frames all differ: the compiled size of
+  a 450x450 banner is unchanged to the byte, and the extra pass over its 300
+  frames does not measurably lengthen its 2.6 s compile.
+* Stops playing an animation that never changes what it draws. A document can
+  declare an animation the renderer cannot express — a morphing `d`, say — which
+  sampled to sixty identical pictures, reported itself as animated, and ran a
+  ticker that repainted the same picture for as long as the widget was on
+  screen. `AnimatedSvgFrames.isAnimated` now counts pictures rather than
+  sampling points, so nothing is started. `distinctFrameCount` reports how many
+  there are, next to `frameCount`, which keeps its meaning as the resolution the
+  timeline was sampled at.
+
 ## 0.3.4
 
 * Bounds the animation cache by how much it is holding and not only by how many
