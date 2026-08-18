@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.4
 
 * Bounds the animation cache by how much it is holding and not only by how many
   animations it holds, through `AnimationCache.maximumSizeBytes`, which defaults
