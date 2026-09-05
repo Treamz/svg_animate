@@ -29,8 +29,8 @@ class AnimatedSvgExampleApp extends StatelessWidget {
           children: <Widget>[
             for (final MapEntry<String, String> asset in _assets.entries)
               _Sample(assetName: asset.key, description: asset.value),
-            // const Divider(height: 48),
-            // const _ControlledSample(),
+            const Divider(height: 48),
+            const _ControlledSample(),
           ],
         ),
       ),
