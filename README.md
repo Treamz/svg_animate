@@ -189,19 +189,32 @@ of on every frame change. For a 450×450 banner carrying five embedded bitmaps
 that is 5.1 MB rather than 27.5 MB, and 1.5 ms rather than 6.8 ms to change
 frame — the same cost as an SVG that embeds nothing at all.
 
+Frames that come out of the compiler identical are also stored once. A document
+holds still more often than it looks: a `<set>`, a discrete `calcMode`, a CSS
+`steps()` timing function or a long gap between keyframes all sample to the same
+picture repeatedly, so a one-second blink at the default frame rate holds two
+pictures rather than sixty. An animation that never changes what it draws is not
+played at all, since a ticker would have nothing to do but repaint it.
+
 An animation can say what it costs rather than being guessed at:
 
 ```dart
 final AnimatedSvgFrames frames = await compileAnimatedSvg(markup);
-debugPrint('${frames.frameCount} frames, ${frames.compiledByteSize} bytes');
+debugPrint('${frames.frameCount} frames, ${frames.distinctFrameCount} distinct, '
+    '${frames.compiledByteSize} bytes');
 ```
 
 - `frameRate` (default `60`) — frames compiled per second of animation.
 - `maxFrames` (default `300`) — ceiling; longer animations are sampled at a
   lower rate rather than growing without bound.
-- `placeholderBuilder` — shown while the animation compiles.
-- `svgAnimateCache` — the shared cache of compiled animations. Lower its
-  `maximumSize` (default 10) to trade recompilation for memory.
+- `placeholderBuilder` — shown until there is a picture. The first frame is
+  compiled ahead of the rest, so it appears well before the animation is ready
+  to move.
+- `svgAnimateCache` — the shared cache of compiled animations. It is bounded by
+  `maximumSizeBytes` (default 20 MiB) as well as by `maximumSize` (default 10
+  entries), because a spinner and a banner carrying embedded bitmaps differ in
+  size by three orders of magnitude and a count alone says very little about
+  memory. `currentSizeBytes` reports what is held.
 
 On the web there are no isolates, so compilation runs on the main thread; prefer
 a lower `frameRate` for long animations there.

@@ -1,3 +1,18 @@
+## Unreleased
+
+* Publishes for the web again, and for WebAssembly with it. `dart:io` was
+  imported for the file loader's `File`, and an import of it anywhere in the
+  library is enough for the whole package to be analysed as not supporting the
+  web: pub.dev listed five platforms while the README promised six and described
+  what the package does on the sixth. That import now resolves to a stand-in
+  where there is no `dart:io`, the way `flutter_svg` does it. Nothing about
+  behaviour changes — a web build already compiled — and a file loader still
+  cannot be built on the web, because there are still no files there.
+* Documents `AnimationCache.maximumSizeBytes`, `currentSizeBytes` and
+  `AnimatedSvgFrames.distinctFrameCount` in the README, which went on describing
+  the cache as bounded by a count of entries alone: the model 0.3.4 replaced
+  precisely because a count says so little about how much memory is held.
+
 ## 0.3.5
 
 * Keeps one copy of any frame that repeats, rather than one per sampling point.

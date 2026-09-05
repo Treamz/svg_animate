@@ -1,5 +1,3 @@
-import 'dart:io' show File;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart' show ColorMapper, SvgTheme;
@@ -10,6 +8,7 @@ import 'animation/cache.dart';
 import 'animation/frames.dart';
 import 'color_mapper.dart';
 import 'loaders.dart';
+import 'utilities/file.dart';
 
 /// Builds the widget shown when an animation fails to load.
 typedef SvgErrorWidgetBuilder =
