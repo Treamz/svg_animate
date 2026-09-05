@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.6
 
 * Says what an SVG asked for that will not happen, instead of leaving it to be
   deduced. An animation that does not play looks exactly like one that has not
