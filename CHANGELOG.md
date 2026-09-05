@@ -1,5 +1,18 @@
 ## Unreleased
 
+* Says what an SVG asked for that will not happen, instead of leaving it to be
+  deduced. An animation that does not play looks exactly like one that has not
+  started: a still picture and no error, whatever the reason. Every compiled
+  animation now carries `diagnostics`, and a debug build prints them the first
+  time the SVG is compiled. Five things get reported: a document with no
+  animation in it, and whether it carries a `<script>` that an editor exported
+  its animation into; an animation whose every frame drew the same picture,
+  which is what a morphing `d` does; an `<image>` pointing anywhere other than a
+  `data:` URI, which the compiler leaves out of every frame without complaining;
+  a `<filter>`, which is not drawn; and an animation sampled below the frame
+  rate asked for because `maxFrames` would not stretch that far. Set
+  `svgAnimateReportDiagnostics` to false to silence the printing.
+
 * Publishes for the web again, and for WebAssembly with it. `dart:io` was
   imported for the file loader's `File`, and an import of it anywhere in the
   library is enough for the whole package to be analysed as not supporting the

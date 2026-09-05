@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:vector_graphics/vector_graphics_compat.dart';
 
 import 'animation/cache.dart';
+import 'animation/diagnostics.dart';
 import 'animation/frames.dart';
 import 'color_mapper.dart';
 import 'loaders.dart';
@@ -669,6 +670,7 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
         key,
         () => _compile(source, loader, frameCap: widget.maxFrames),
       );
+      _reportDiagnostics(frames, loader);
       _adopt(frames, generation);
     } catch (error, stackTrace) {
       if (!mounted || generation != _loadGeneration) {
@@ -736,6 +738,23 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
       _frameIndex = 0;
     });
     _startPlayback(frames);
+  }
+
+  // An animation that will not play looks exactly like one that has not
+  // started yet, and neither raises anything. Saying so once, where a developer
+  // is already looking, is the difference between a puzzle and a sentence.
+  // Debug builds only, and only the first time an animation is compiled, since
+  // the cache serves every picture after that.
+  void _reportDiagnostics(AnimatedSvgFrames frames, SvgSourceLoader<Object?> loader) {
+    if (!svgAnimateReportDiagnostics || frames.diagnostics.isEmpty) {
+      return;
+    }
+    assert(() {
+      for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
+        debugPrint('svg_animate: $loader\n  ${diagnostic.message}');
+      }
+      return true;
+    }());
   }
 
   bool _repeats(AnimatedSvgFrames frames) => widget.repeat ?? frames.loops;

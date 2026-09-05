@@ -145,6 +145,31 @@ renderer cannot do them on its own:
 | `<script>` | not run |
 | `@media`, `@supports` | skipped rather than guessed at |
 
+### When nothing moves
+
+An SVG that will not animate looks exactly like one that has not started yet: a
+still picture and no error at all. Every compiled animation carries a list of
+what it asked for that will not happen, and in debug builds an
+`AnimatedSvgPicture` prints it the first time the SVG is compiled.
+
+```dart
+final AnimatedSvgFrames frames = await compileAnimatedSvg(markup);
+for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
+  debugPrint('${diagnostic.kind}: ${diagnostic.message}');
+}
+```
+
+| kind | what it means |
+|---|---|
+| `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
+| `neverChanges` | an animation was declared, and every frame of it drew the same picture — something is animated that the renderer cannot express, a morphing `d` most often |
+| `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
+| `droppedFilter` | a `<filter>` is used, and filters are not drawn |
+| `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
+
+Set `svgAnimateReportDiagnostics` to `false` to keep the printing out of a test
+that loads such a file deliberately.
+
 ## How it compares
 
 This package deliberately covers less of SVG than the alternatives, and carries
