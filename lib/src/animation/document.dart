@@ -1,5 +1,7 @@
 import 'package:xml/xml.dart';
 
+import 'diagnostics.dart';
+
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
@@ -137,6 +139,13 @@ class AnimatedSvgDocument {
 
   final XmlDocument _document;
   final List<_AnimationTarget> _targets;
+
+  /// What this document contains that will not survive being compiled.
+  ///
+  /// Read after parsing, when the animation elements have been resolved away
+  /// and what is left is what the compiler will be handed.
+  List<SvgAnimateDiagnostic> get diagnostics =>
+      diagnoseDocument(_document, hasAnimation: _targets.isNotEmpty);
 
   /// How long one full loop of the document takes.
   ///

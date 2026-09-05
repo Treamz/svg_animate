@@ -4,6 +4,7 @@ import 'package:vector_graphics/vector_graphics.dart';
 import 'package:vector_graphics_compiler/vector_graphics_compiler.dart' as vg;
 
 import '../utilities/compute.dart';
+import 'diagnostics.dart';
 import 'document.dart';
 
 /// The default number of frames compiled per second of animation.
@@ -36,6 +37,7 @@ class AnimatedSvgFrames {
     required List<int>? storage,
     required this.duration,
     required this.loops,
+    required this.diagnostics,
   }) : _shared = shared,
        _tails = tails,
        _storage = storage;
@@ -46,6 +48,7 @@ class AnimatedSvgFrames {
     List<Uint8List> frames, {
     required Duration duration,
     required bool loops,
+    List<SvgAnimateDiagnostic> diagnostics = const <SvgAnimateDiagnostic>[],
   }) {
     assert(frames.isNotEmpty);
     final int shared = _sharedPrefixLength(frames);
@@ -57,6 +60,7 @@ class AnimatedSvgFrames {
       storage: distinct.storage,
       duration: duration,
       loops: loops,
+      diagnostics: diagnostics,
     );
   }
 
@@ -73,6 +77,12 @@ class AnimatedSvgFrames {
 
   /// Whether playback should restart after the last frame.
   final bool loops;
+
+  /// What this SVG asks for that will not happen, if anything.
+  ///
+  /// An animation that does not play looks the same whatever the reason, so
+  /// these say which reason it was. Empty for an SVG with nothing to report.
+  final List<SvgAnimateDiagnostic> diagnostics;
 
   /// How many frames the animation was sampled at.
   ///
@@ -116,6 +126,18 @@ class AnimatedSvgFrames {
       ..setRange(_shared.length, _shared.length + tail.length, tail);
     return frame.buffer.asByteData();
   }
+
+  /// The same frames, carrying [diagnostics] in place of the ones they hold.
+  ///
+  /// Shares the stored frames rather than splitting and comparing them again.
+  AnimatedSvgFrames _withDiagnostics(List<SvgAnimateDiagnostic> diagnostics) => AnimatedSvgFrames._(
+    shared: _shared,
+    tails: _tails,
+    storage: _storage,
+    duration: duration,
+    loops: loops,
+    diagnostics: diagnostics,
+  );
 
   /// The frame to show at [progress] through the animation, from 0.0 to 1.0.
   int frameIndexAt(double progress) {
@@ -255,6 +277,10 @@ Future<AnimatedSvgFrames> compileAnimatedSvgFrames(
       final document = AnimatedSvgDocument.parse(source);
       final Duration duration = document.duration;
       final int frameCount = _frameCount(duration, frameRate, maxFrames);
+      final diagnostics = <SvgAnimateDiagnostic>[
+        ...document.diagnostics,
+        ..._samplingDiagnostics(duration, frameRate, frameCount),
+      ];
       final frames = <Uint8List>[
         for (var index = 0; index < frameCount; index += 1)
           vg.encodeSvg(
@@ -267,11 +293,57 @@ Future<AnimatedSvgFrames> compileAnimatedSvgFrames(
             enableOverdrawOptimizer: false,
           ),
       ];
-      return AnimatedSvgFrames.fromEncodedFrames(frames, duration: duration, loops: document.loops);
+      final AnimatedSvgFrames compiled = AnimatedSvgFrames.fromEncodedFrames(
+        frames,
+        duration: duration,
+        loops: document.loops,
+        diagnostics: diagnostics,
+      );
+      // Only knowable once the frames exist: the document declared an animation
+      // and every sample of it came out as the same picture. Reported by
+      // rebuilding the wrapper rather than the frames, which have already been
+      // split and compared and would otherwise be split and compared again.
+      if (compiled.frameCount > 1 && compiled.distinctFrameCount == 1) {
+        return compiled._withDiagnostics(<SvgAnimateDiagnostic>[
+          ...diagnostics,
+          const SvgAnimateDiagnostic(
+            SvgAnimateDiagnosticKind.neverChanges,
+            'This SVG declares an animation, and every frame it was sampled at drew '
+            'exactly the same picture. Something is being animated that the '
+            'renderer cannot express — a morphing "d" is the usual one — so the '
+            'values change and nothing about the drawing does. It is treated as a '
+            'still picture and no ticker is started.',
+          ),
+        ]);
+      }
+      return compiled;
     },
     source,
     debugLabel: 'Compile animated SVG',
   );
+}
+
+/// Whether [maxFrames] forced a lower sampling rate than [frameRate] asked for.
+List<SvgAnimateDiagnostic> _samplingDiagnostics(
+  Duration duration,
+  double frameRate,
+  int frameCount,
+) {
+  final double seconds = duration.inMicroseconds / Duration.microsecondsPerSecond;
+  if (seconds <= 0 || (seconds * frameRate).round() <= frameCount) {
+    return const <SvgAnimateDiagnostic>[];
+  }
+  final double effective = frameCount / seconds;
+  return <SvgAnimateDiagnostic>[
+    SvgAnimateDiagnostic(
+      SvgAnimateDiagnosticKind.reducedFrameRate,
+      'This animation runs for ${seconds.toStringAsFixed(2)} s, which at '
+      '${frameRate.toStringAsFixed(0)} fps is more frames than maxFrames allows. It was '
+      'sampled at ${effective.toStringAsFixed(1)} fps instead, over its whole length, so '
+      'it plays complete but less smoothly. Raise maxFrames to spend memory on '
+      'smoothness.',
+    ),
+  ];
 }
 
 int _frameCount(Duration duration, double frameRate, int maxFrames) {
