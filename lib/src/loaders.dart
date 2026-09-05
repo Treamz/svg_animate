@@ -1,5 +1,4 @@
 import 'dart:convert' show utf8;
-import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart' hide compute;
 import 'package:flutter/services.dart';
@@ -8,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart' show ColorMapper, DefaultSvgTheme,
 import 'package:http/http.dart' as http;
 
 import 'utilities/compute.dart';
+import 'utilities/file.dart';
 
 /// The SVG markup a loader provides, along with everything needed to compile
 /// it.
