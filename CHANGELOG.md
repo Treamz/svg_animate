@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.8
 
 * Adds `precacheAnimatedSvg`, which compiles an animation into the shared cache
   before anything shows it. Compiling is the expensive part of drawing an
