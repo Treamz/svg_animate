@@ -11,3 +11,6 @@ pubspec.lock
 
 # macOS
 .DS_Store
+
+# Written by `flutter test --coverage`.
+/coverage/
