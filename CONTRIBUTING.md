@@ -25,6 +25,30 @@ Tests live alongside what they cover. `test/animation/` holds the parsing and
 sampling, which is where most of the behaviour is and where a bug is cheapest to
 pin down; `test/animated_svg_test.dart` drives the widget.
 
+### Golden tests
+
+`test/golden_test.dart` renders frames and compares them to images in
+`test/goldens/`. Everything else in the suite reads the markup a frame was
+compiled from, which is where the values are but not where the drawing is: a
+rounded rectangle whose corner radius outgrew its width drew as a bow tie in the
+example and in the README image for months, with every attribute exactly as it
+should have been.
+
+They run on macOS only. Antialiasing along a curve differs between platforms, so
+an image stored from one fails on another for reasons that have nothing to do
+with this package. CI runs the suite on macOS as well as on Linux, so they are
+checked on every pull request; a looser comparison that survived both renderers
+would also be loose enough to miss a thin shape disappearing.
+
+Regenerate after a deliberate change to what is drawn:
+
+```sh
+flutter test --update-goldens test/golden_test.dart
+```
+
+Then look at what changed before committing it. A golden updated without being
+looked at is a test that has been turned off.
+
 ## Releasing
 
 Releases are driven by a git tag, so that whatever reaches pub.dev is a commit
