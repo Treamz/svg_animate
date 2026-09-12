@@ -247,6 +247,25 @@ debugPrint('${frames.frameCount} frames, ${frames.distinctFrameCount} distinct, 
 On the web there are no isolates, so compilation runs on the main thread; prefer
 a lower `frameRate` for long animations there.
 
+Compiling is what the wait is made of, and it can be done before anything is
+waiting. `precacheAnimatedSvg` compiles an animation into the same cache the
+picture reads, so the picture is there the moment the widget is:
+
+```dart
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  precacheAnimatedSvg(const SvgAnimateAssetLoader('assets/intro.svg'), context);
+}
+```
+
+Pass the context the picture will be built under, since that is what resolves an
+enclosing `DefaultSvgTheme` and `DefaultAssetBundle`, and pass the same
+`frameRate` and `maxFrames`: an animation compiled at one frame rate is not the
+one compiled at another, and they are cached apart. It returns the compiled
+frames, so it can also answer what an animation costs before deciding anything
+about it.
+
 ## Contributing
 
 Development setup and the release process are in

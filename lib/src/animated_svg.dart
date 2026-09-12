@@ -545,29 +545,6 @@ class AnimatedSvgPicture extends StatefulWidget {
   }
 }
 
-/// The cache key for a compiled animation.
-///
-/// The frame rate and frame ceiling are part of the key because they change the
-/// frames that get compiled, not just how they are played back.
-@immutable
-class _AnimationCacheKey {
-  const _AnimationCacheKey(this.loaderKey, this.frameRate, this.maxFrames);
-
-  final Object loaderKey;
-  final double frameRate;
-  final int maxFrames;
-
-  @override
-  bool operator ==(Object other) =>
-      other is _AnimationCacheKey &&
-      other.loaderKey == loaderKey &&
-      other.frameRate == frameRate &&
-      other.maxFrames == maxFrames;
-
-  @override
-  int get hashCode => Object.hash(loaderKey, frameRate, maxFrames);
-}
-
 // Uses [TickerProviderStateMixin] rather than the single ticker variant because
 // a new playback controller, and so a new ticker, is created every time the
 // animation is recompiled.
@@ -632,7 +609,7 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
   }
 
   Object _cacheKey() =>
-      _AnimationCacheKey(widget.bytesLoader.cacheKey(context), widget.frameRate, widget.maxFrames);
+      AnimatedSvgCacheKey(widget.bytesLoader.cacheKey(context), widget.frameRate, widget.maxFrames);
 
   Future<void> _load() async {
     final SvgSourceLoader<Object?> loader = widget.bytesLoader;

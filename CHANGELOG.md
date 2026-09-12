@@ -1,3 +1,15 @@
+## Unreleased
+
+* Adds `precacheAnimatedSvg`, which compiles an animation into the shared cache
+  before anything shows it. Compiling is the expensive part of drawing an
+  animated SVG and it happened when the picture was first built, so a large
+  document showed a placeholder, then a still first frame, and only then moved.
+  There was no way to do that work on the screen before, because the key the
+  picture looks an animation up under was private and `compileAnimatedSvg`
+  compiled without caching. `AnimatedSvgCacheKey` is exported with it, which also
+  makes `AnimationCache`'s `[]` and `evict` usable: both take a key, and until
+  now there was no way to build one.
+
 ## 0.3.7
 
 * Keeps a rounded rectangle's corner radius inside the size it is drawn at. SVG
