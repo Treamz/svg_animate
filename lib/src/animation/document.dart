@@ -1,15 +1,92 @@
-import 'package:xml/xml.dart';
+import 'dart:math' as math;
 
-import 'diagnostics.dart';
+import 'package:xml/xml.dart';
 
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
+import 'diagnostics.dart';
 import 'expand_use.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
 import 'values.dart';
+
+/// A `<rect>` whose corner radius has to be kept within the size it is drawn at.
+///
+/// SVG clamps a corner radius larger than half the side it rounds down to half
+/// that side, so a rect of zero width has square corners and draws nothing.
+/// `vector_graphics_compiler` hands `rx` and `ry` to `addRRect` exactly as
+/// authored — `_Paths.rect` in `svg/parser.dart` — so the rounded ends cross
+/// over one another and a zero-width rect draws as a bow tie instead of as
+/// nothing at all.
+///
+/// This is worth fixing in flutter/packages rather than only here: it is a
+/// couple of lines in that parser, it is a plain spec violation, and it would
+/// fix the same artefact for still SVGs drawn through `flutter_svg`, which this
+/// package cannot reach. Clamping here only covers documents it compiles.
+///
+/// The radius is always recomputed from the authored one rather than from
+/// whatever was written last: a radius too large at one width is right again at
+/// the next, and folding the clamp back into the source would square the
+/// corners for the rest of the animation.
+class _RoundedRect {
+  _RoundedRect(this.element, this.rx, this.ry);
+
+  /// The rect, if [element] is one with a corner radius to look after.
+  static _RoundedRect? of(XmlElement element) {
+    if (element.name.local != 'rect') {
+      return null;
+    }
+    final double? rx = _numericAttribute(element, 'rx');
+    final double? ry = _numericAttribute(element, 'ry');
+    if (rx == null && ry == null) {
+      return null;
+    }
+    // Either one on its own stands for both.
+    return _RoundedRect(element, rx ?? ry!, ry ?? rx!);
+  }
+
+  final XmlElement element;
+
+  /// As authored, never as last written.
+  final double rx;
+  final double ry;
+
+  /// Brings the radius within the size the rect currently has.
+  void clamp() {
+    final double? width = _numericAttribute(element, 'width');
+    final double? height = _numericAttribute(element, 'height');
+    if (width == null || height == null) {
+      // A length this cannot read on its own, a percentage most likely.
+      // Leaving the radius alone is wrong less often than guessing at the size.
+      return;
+    }
+    final double x = math.min(rx, math.max(width, 0) / 2);
+    final double y = math.min(ry, math.max(height, 0) / 2);
+    if (x <= 0 || y <= 0) {
+      // A corner needs both radii to be rounded at all, so either one reaching
+      // zero squares it. Removing them takes the compiler down its plain
+      // rectangle path rather than asking it to round by nothing.
+      element.removeAttribute('rx');
+      element.removeAttribute('ry');
+      return;
+    }
+    element.setAttribute('rx', formatSvgNumber(x));
+    element.setAttribute('ry', formatSvgNumber(y));
+  }
+}
+
+/// The value of [name] on [element] as a plain number, or null for anything
+/// carrying units, a percentage, or nothing at all.
+double? _numericAttribute(XmlElement element, String name) {
+  final String? value = element.getAttribute(name);
+  if (value == null) {
+    return null;
+  }
+  final double? parsed = double.tryParse(value.trim());
+  return parsed != null && parsed.isFinite ? parsed : null;
+}
 
 /// The longest loop this package will build for a document whose animations
 /// repeat indefinitely.
@@ -27,7 +104,13 @@ const Duration maxLoopDuration = Duration(seconds: 60);
 /// Sampling produces plain SVG markup with no animation elements, so the result
 /// can be handed to the ordinary vector_graphics compiler.
 class AnimatedSvgDocument {
-  AnimatedSvgDocument._(this._document, this._targets, this.duration, this.loops);
+  AnimatedSvgDocument._(
+    this._document,
+    this._targets,
+    this._roundedRects,
+    this.duration,
+    this.loops,
+  );
 
   /// Parses [source] and resolves the animations it declares.
   ///
@@ -133,12 +216,29 @@ class AnimatedSvgDocument {
       }
     }
 
+    // A rounded rect whose size changes has to have its radius kept inside that
+    // size for every frame; one whose size is fixed only needs it once.
+    final roundedRects = <_RoundedRect>[];
+    for (final XmlElement element in document.descendantElements) {
+      final _RoundedRect? rect = _RoundedRect.of(element);
+      if (rect == null) {
+        continue;
+      }
+      if (targetsByKey.containsKey((element, 'width')) ||
+          targetsByKey.containsKey((element, 'height'))) {
+        roundedRects.add(rect);
+      } else {
+        rect.clamp();
+      }
+    }
+
     final _DocumentTiming timing = _documentTiming(targets);
-    return AnimatedSvgDocument._(document, targets, timing.duration, timing.loops);
+    return AnimatedSvgDocument._(document, targets, roundedRects, timing.duration, timing.loops);
   }
 
   final XmlDocument _document;
   final List<_AnimationTarget> _targets;
+  final List<_RoundedRect> _roundedRects;
 
   /// What this document contains that will not survive being compiled.
   ///
@@ -167,6 +267,9 @@ class AnimatedSvgDocument {
   String sampleAt(Duration time) {
     for (final _AnimationTarget target in _targets) {
       target.applyAt(time);
+    }
+    for (final _RoundedRect rect in _roundedRects) {
+      rect.clamp();
     }
     return _document.toXmlString();
   }

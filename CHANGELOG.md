@@ -1,3 +1,15 @@
+## Unreleased
+
+* Keeps a rounded rectangle's corner radius inside the size it is drawn at. SVG
+  clamps a radius larger than half the side it rounds down to half that side, so
+  a rect of zero width draws nothing; `vector_graphics_compiler` uses the radius
+  as authored, and the two rounded ends cross over one another into a bow tie.
+  Anything that grows a rounded bar from nothing showed it — including the
+  progress bar in this package's own example and in its README — for as long as
+  the bar was narrower than twice its radius. Worth fixing in flutter/packages
+  too, where it would also fix still SVGs drawn through `flutter_svg`; the code
+  here can only reach what it compiles itself.
+
 ## 0.3.6
 
 * Says what an SVG asked for that will not happen, instead of leaving it to be
