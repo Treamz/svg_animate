@@ -11,11 +11,12 @@
 library;
 
 export 'src/animated_svg.dart';
-export 'src/animation/cache.dart' show AnimationCache, svgAnimateCache;
+export 'src/animation/cache.dart' show AnimatedSvgCacheKey, AnimationCache, svgAnimateCache;
 export 'src/animation/diagnostics.dart'
     show SvgAnimateDiagnostic, SvgAnimateDiagnosticKind, svgAnimateReportDiagnostics;
 export 'src/animation/frames.dart'
     show AnimatedSvgFrames, defaultAnimationFrameRate, defaultMaxAnimationFrames;
 export 'src/compile.dart' show compileAnimatedSvg;
+export 'src/precache.dart' show precacheAnimatedSvg;
 export 'src/color_mapper.dart' show toVgColorMapper;
 export 'src/loaders.dart';

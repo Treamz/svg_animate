@@ -193,6 +193,41 @@ class AnimationCache {
   }
 }
 
+/// What a compiled animation is cached under.
+///
+/// Built in one place because two of them have to agree exactly: the widget
+/// looks an animation up by this, and [precacheAnimatedSvg] stores it by this.
+/// If they ever computed it differently, precaching would appear to work and
+/// quietly do nothing, since a miss is indistinguishable from never having
+/// been asked.
+@immutable
+class AnimatedSvgCacheKey {
+  /// See class doc.
+  const AnimatedSvgCacheKey(this.loaderKey, this.frameRate, this.maxFrames);
+
+  /// What the loader says identifies its source.
+  final Object loaderKey;
+
+  /// Frames compiled per second, which changes what was compiled.
+  final double frameRate;
+
+  /// The ceiling on the frame count, which changes it too.
+  final int maxFrames;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AnimatedSvgCacheKey &&
+      other.loaderKey == loaderKey &&
+      other.frameRate == frameRate &&
+      other.maxFrames == maxFrames;
+
+  @override
+  int get hashCode => Object.hash(loaderKey, frameRate, maxFrames);
+
+  @override
+  String toString() => 'AnimatedSvgCacheKey($loaderKey, ${frameRate}fps, max $maxFrames)';
+}
+
 /// The cache of compiled animations shared by every [AnimatedSvgPicture].
 ///
 /// Entries are large, because an animation holds one compiled vector graphic
