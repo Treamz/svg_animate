@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.7
 
 * Keeps a rounded rectangle's corner radius inside the size it is drawn at. SVG
   clamps a radius larger than half the side it rounds down to half that side, so
