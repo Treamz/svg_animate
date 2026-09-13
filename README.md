@@ -7,7 +7,10 @@
 [![platform](https://img.shields.io/badge/platform-android%20%7C%20ios%20%7C%20macos%20%7C%20windows%20%7C%20linux%20%7C%20web-lightgrey)](https://pub.dev/packages/svg_animate)
 
 **[Live demo](https://treamz.github.io/svg_animate/)** — the example app, built
-for the web and running the package rather than describing it.
+for the web and running the package rather than describing it. Its **Try your
+own** tab takes an SVG of yours, as a file, a URL or pasted markup, and reports
+what compiling it produced: how many frames, how many of those actually differ,
+what they cost, and anything in the file that will not survive being drawn.
 
 Plays SVGs that declare their own animation — SMIL (`<animate>`,
 `<animateTransform>`, `<animateMotion>`, `<set>`), CSS `@keyframes`, and CSS
