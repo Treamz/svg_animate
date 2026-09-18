@@ -80,6 +80,90 @@ void main() {
       expect(found.single.message, contains('1 filter'));
     });
 
+    test('offers the widget-layer blur when the filter is only a blur', () async {
+      // The one substitution that exists: vector_graphics cannot blur an element
+      // inside the picture, and Flutter can blur the picture, so the diagnostic
+      // that used to end at "nothing can be done" now ends with how.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><filter id="b"><feGaussianBlur stdDeviation="3"/></filter></defs>
+  <rect width="50" height="50" fill="#f00" filter="url(#b)">
+    <animate attributeName="x" dur="1s" values="0;40" repeatCount="indefinite"/>
+  </rect>
+</svg>''');
+
+      expect(found.single.message, contains('ImageFiltered'));
+      expect(found.single.message, contains('ImageFilter.blur(sigmaX: 3.0, sigmaY: 3.0)'));
+      expect(
+        found.single.message,
+        isNot(contains('Nothing in this package can add them')),
+        reason: 'there is something, and the message now says what',
+      );
+    });
+
+    test('carries both axes of a stdDeviation that gives two', () async {
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><filter id="b"><feGaussianBlur stdDeviation="2 4.5"/></filter></defs>
+  <rect width="50" height="50" fill="#f00" filter="url(#b)">
+    <animate attributeName="x" dur="1s" values="0;40" repeatCount="indefinite"/>
+  </rect>
+</svg>''');
+
+      expect(found.single.message, contains('ImageFilter.blur(sigmaX: 2.0, sigmaY: 4.5)'));
+    });
+
+    test('offers nothing for a filter that does more than blur', () async {
+      // A blur plus an offset is a drop shadow, and blurring the whole picture
+      // is not one. Saying there is no way beats sending somebody after a
+      // substitution that will not look like what they asked for.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <filter id="s">
+      <feGaussianBlur stdDeviation="3"/>
+      <feOffset dx="2" dy="2"/>
+    </filter>
+  </defs>
+  <rect width="50" height="50" fill="#f00" filter="url(#s)">
+    <animate attributeName="x" dur="1s" values="0;40" repeatCount="indefinite"/>
+  </rect>
+</svg>''');
+
+      expect(found.single.message, contains('Nothing in this package can add them'));
+      expect(found.single.message, isNot(contains('ImageFiltered')));
+    });
+
+    test('offers nothing when two different filters are used', () async {
+      // One blur over the whole picture cannot stand in for two of them.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <filter id="a"><feGaussianBlur stdDeviation="2"/></filter>
+    <filter id="b"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <rect width="20" height="20" fill="#f00" filter="url(#a)">
+    <animate attributeName="x" dur="1s" values="0;40" repeatCount="indefinite"/>
+  </rect>
+  <rect x="50" width="20" height="20" fill="#00f" filter="url(#b)"/>
+</svg>''');
+
+      expect(found.single.message, contains('2 filters'));
+      expect(found.single.message, isNot(contains('ImageFiltered')));
+    });
+
+    test('offers nothing for a blur of zero, which would change nothing', () async {
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><filter id="b"><feGaussianBlur/></filter></defs>
+  <rect width="50" height="50" fill="#f00" filter="url(#b)">
+    <animate attributeName="x" dur="1s" values="0;40" repeatCount="indefinite"/>
+  </rect>
+</svg>''');
+
+      expect(found.single.message, isNot(contains('ImageFiltered')));
+    });
+
     test('does not mistake a gradient in a style for a filter', () async {
       // `fill: url(#…)` is far more common than a filter, and gradients draw.
       final List<SvgAnimateDiagnostic> found = await diagnose('''

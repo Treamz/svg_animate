@@ -100,15 +100,17 @@ List<SvgAnimateDiagnostic> diagnoseDocument(XmlDocument document, {required bool
     );
   }
 
-  final int filters = _filterCount(document);
-  if (filters > 0) {
+  final Set<String> filters = _usedFilters(document);
+  if (filters.isNotEmpty) {
+    final String opening =
+        'This SVG uses ${filters.length} filter${filters.length == 1 ? '' : 's'}. '
+        'vector_graphics, the renderer this package draws through, does not implement '
+        '<filter>: the shapes are drawn and the blurs, glows and drop shadows are not.';
+    final String? recipe = _blurRecipe(document, filters);
     diagnostics.add(
       SvgAnimateDiagnostic(
         SvgAnimateDiagnosticKind.droppedFilter,
-        'This SVG uses $filters filter${filters == 1 ? '' : 's'}. vector_graphics, the '
-        'renderer this package draws through, does not implement <filter>: the shapes '
-        'are drawn and the blurs, glows and drop shadows are not. Nothing in this '
-        'package can add them.',
+        recipe == null ? '$opening Nothing in this package can add them.' : '$opening\n\n$recipe',
       ),
     );
   }
@@ -119,9 +121,9 @@ List<SvgAnimateDiagnostic> diagnoseDocument(XmlDocument document, {required bool
 bool _containsScript(XmlDocument document) =>
     document.descendantElements.any((XmlElement e) => e.name.local == 'script');
 
-/// Counts filters that are actually reached, rather than every `<filter>`
+/// The ids of filters that are actually reached, rather than every `<filter>`
 /// defined, since a definition nothing refers to costs nothing.
-int _filterCount(XmlDocument document) {
+Set<String> _usedFilters(XmlDocument document) {
   final used = <String>{};
   for (final XmlElement element in document.descendantElements) {
     final String? attribute = element.getAttribute('filter');
@@ -137,8 +139,79 @@ int _filterCount(XmlDocument document) {
       }
     }
   }
-  return used.length;
+  return used;
 }
+
+/// What to do instead, when the whole of what is being dropped is one blur.
+///
+/// The renderer cannot blur one element inside a picture, but Flutter can blur
+/// the picture, and [AnimatedSvgPicture] already has the hook for it. That
+/// covers the common case by a wide margin: a lone `feGaussianBlur` is what a
+/// glow or a soft shadow is exported as.
+///
+/// Returns null for anything else — several filters, or a filter that does more
+/// than blur — rather than describing a substitution that would not look like
+/// what was asked for. Being told there is no way is better than being sent
+/// after one that does not work.
+String? _blurRecipe(XmlDocument document, Set<String> used) {
+  if (used.length != 1) {
+    return null;
+  }
+  final String id = used.single;
+  XmlElement? filter;
+  for (final XmlElement element in document.descendantElements) {
+    if (element.name.local == 'filter' && element.getAttribute('id') == id) {
+      filter = element;
+      break;
+    }
+  }
+  if (filter == null) {
+    return null;
+  }
+
+  final List<XmlElement> primitives = filter.childElements.toList();
+  if (primitives.length != 1 || primitives.single.name.local != 'feGaussianBlur') {
+    return null;
+  }
+
+  final List<double> deviation = _numbers(primitives.single.getAttribute('stdDeviation'));
+  if (deviation.isEmpty || deviation.first <= 0) {
+    return null;
+  }
+  // One number means both axes, which is how `stdDeviation` is defined.
+  final String x = _trim(deviation.first);
+  final String y = _trim(deviation.length > 1 ? deviation[1] : deviation.first);
+
+  return 'The whole of it is one feGaussianBlur, which Flutter can approximate at the '
+      'widget layer even though the renderer cannot do it inside the picture:\n\n'
+      '  AnimatedSvgPicture.asset(\n'
+      '    ...,\n'
+      '    imageBuilder: (BuildContext context, Widget child) => ImageFiltered(\n'
+      '      imageFilter: ImageFilter.blur(sigmaX: $x, sigmaY: $y),\n'
+      '      child: child,\n'
+      '    ),\n'
+      '  );\n\n'
+      'That blurs everything the SVG draws rather than the one element the filter is '
+      'on, and the sigma is in the SVG\'s own units, so it wants scaling by however '
+      'much the picture is drawn larger or smaller than its view box.';
+}
+
+/// The numbers in an SVG list, which may be separated by commas, whitespace, or
+/// both.
+List<double> _numbers(String? value) {
+  if (value == null) {
+    return const <double>[];
+  }
+  return <double>[
+    for (final RegExpMatch match in _number.allMatches(value))
+      if (double.tryParse(match.group(0)!) case final double parsed) parsed,
+  ];
+}
+
+final RegExp _number = RegExp(r'-?\d*\.?\d+(?:[eE][-+]?\d+)?');
+
+/// Writes a double the way somebody would type it into Dart.
+String _trim(double value) => value == value.roundToDouble() ? value.toStringAsFixed(1) : '$value';
 
 void _collectReferences(String value, Set<String> into) {
   for (final RegExpMatch match in _urlReference.allMatches(value)) {

@@ -41,6 +41,13 @@ class AnimatedSvgController extends ChangeNotifier {
   double? _seekRequested;
   Duration? _seekPositionRequested;
   bool _disposed = false;
+  bool _reversed = false;
+
+  /// How long one pass takes at a speed of 1, which is what [speed] scales.
+  ///
+  /// Held separately because the playback controller's own duration is the
+  /// scaled one, so reading the speed back out of it would compound.
+  Duration _naturalDuration = Duration.zero;
 
   /// Whether the picture this controller drives has finished loading.
   ///
@@ -51,9 +58,51 @@ class AnimatedSvgController extends ChangeNotifier {
   /// Whether the animation is currently running.
   bool get isPlaying => _playback?.isAnimating ?? false;
 
-  /// How long one loop of the animation takes, or null until the animation has
-  /// loaded.
+  /// How long one pass through the animation takes at the current [speed], or
+  /// null until the animation has loaded.
+  ///
+  /// This is what [position] and [seekTo] are measured against, so raising the
+  /// speed shortens it rather than leaving it reporting the timing the file
+  /// declared.
   Duration? get duration => _playback?.duration;
+
+  /// How fast playback runs, as a multiple of the timing the SVG declares.
+  ///
+  /// 1.0, the default, is the file's own timing; 2.0 is twice as fast and 0.5
+  /// half. Must be greater than zero — to run backwards use [reverse], since a
+  /// negative speed would mean two things at once and neither clearly.
+  ///
+  /// Changing this costs nothing. The frames were compiled once and are not
+  /// recompiled: only how long playback takes to walk through them changes, so
+  /// the animation is not evicted from the cache and nothing is parsed again.
+  /// The frame rate an animation was compiled at is unaffected, which means a
+  /// speed far above 1 walks through the same frames in less time and so shows
+  /// fewer of them per second.
+  double get speed => _speed;
+  double _speed = 1.0;
+
+  /// Changes the playback speed, taking effect immediately.
+  set speed(double value) {
+    assert(value > 0, 'speed must be greater than zero; use reverse() to play backwards');
+    if (value == _speed) {
+      return;
+    }
+    _speed = value;
+    final AnimationController? playback = _playback;
+    if (playback == null) {
+      return;
+    }
+    _applySpeed(playback);
+    if (playback.isAnimating) {
+      // A controller reads its duration when it is told to run, so a change
+      // made while it is already running only lands if it is told again.
+      _drive(playback);
+    }
+    _notify();
+  }
+
+  /// Whether playback is running, or was last asked to run, backwards.
+  bool get isReversed => _reversed;
 
   /// How far through the animation playback is, from 0.0 to 1.0.
   ///
@@ -72,23 +121,64 @@ class AnimatedSvgController extends ChangeNotifier {
     return playback.duration! * playback.value;
   }
 
-  /// Starts or resumes playback.
+  /// Starts or resumes playback, running forwards.
   void play() {
+    _reversed = false;
+    _start();
+  }
+
+  /// Starts or resumes playback, running backwards towards the first frame.
+  ///
+  /// Called at the first frame of an animation that has finished, this starts
+  /// again from the last one, the way [play] starts again from the first.
+  ///
+  /// An animation that repeats keeps repeating backwards. One that does not
+  /// stops at its first frame, and `onCompleted` is called there, as it is at
+  /// the end of a pass the other way.
+  void reverse() {
+    _reversed = true;
+    _start();
+  }
+
+  void _start() {
     _playRequested = true;
     final AnimationController? playback = _playback;
     if (playback == null) {
       return;
     }
-    if (playback.value >= 1.0 && !_repeats) {
+    if (_reversed) {
+      if (playback.value <= 0.0) {
+        playback.value = 1.0;
+      }
+    } else if (playback.value >= 1.0 && !_repeats) {
       playback.value = 0;
     }
-    if (_repeats) {
+    _drive(playback);
+    _notify();
+  }
+
+  void _drive(AnimationController playback) {
+    if (_reversed) {
+      // `repeat` only ever runs forwards, so a backwards loop is started again
+      // by hand from [_handleLoopStatus] each time it reaches the start.
+      playback.reverse();
+    } else if (_repeats) {
       playback.repeat();
     } else {
       playback.forward();
     }
-    _notify();
   }
+
+  void _applySpeed(AnimationController playback) {
+    playback.duration = _speed == 1.0 ? _naturalDuration : _naturalDuration * (1 / _speed);
+  }
+
+  /// Whether a pass that is running backwards is under way.
+  ///
+  /// Read by the picture to tell reaching the first frame at the end of such a
+  /// pass, which is the end of it, from reaching it because playback was
+  /// stopped or seeked there, which is not.
+  bool get _isRunningBackwards => _reversed && (_playRequested ?? false);
 
   /// Stops playback, leaving the animation on its current frame.
   void pause() {
@@ -98,8 +188,12 @@ class AnimatedSvgController extends ChangeNotifier {
   }
 
   /// Stops playback and returns to the first frame.
+  ///
+  /// Playback is left pointing forwards, so a [play] after this runs the way it
+  /// would have before any [reverse].
   void stop() {
     _playRequested = false;
+    _reversed = false;
     _seekRequested = 0;
     _seekPositionRequested = null;
     _playback
@@ -137,6 +231,11 @@ class AnimatedSvgController extends ChangeNotifier {
     _playback = playback;
     _progress.parent = playback;
     _repeats = repeat;
+    _naturalDuration = playback.duration ?? Duration.zero;
+    // Before the held seek is resolved below, because that resolves a position
+    // against the duration and the duration is the one the speed decides.
+    _applySpeed(playback);
+    playback.addStatusListener(_handleLoopStatus);
     final Duration? seekPosition = _seekPositionRequested;
     final double? seek = _seekRequested;
     if (seekPosition != null) {
@@ -150,15 +249,36 @@ class AnimatedSvgController extends ChangeNotifier {
       playback.value = seek;
     }
     if (_playRequested ?? autoPlay) {
-      play();
+      // `_start` rather than `play`, which would turn a `reverse` asked for
+      // before the picture loaded back into a forward pass.
+      _start();
     } else {
       _notify();
     }
   }
 
   void _detach() {
+    _playback?.removeStatusListener(_handleLoopStatus);
     _playback = null;
     _progress.parent = null;
+  }
+
+  /// Starts the next backwards pass of a looping animation.
+  ///
+  /// [AnimationController.repeat] runs forwards whatever it is given, so the
+  /// loop is closed here: reaching the start while running backwards jumps back
+  /// to the end and runs again.
+  void _handleLoopStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && _repeats && _isRunningBackwards) {
+      _playback?.reverse(from: 1.0);
+      return;
+    }
+    if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+      // Playback stopping because it ran out is a change in [isPlaying] that
+      // nothing else reports, so a play button driven by this controller would
+      // otherwise go on showing a pause icon until something else rebuilt it.
+      _notify();
+    }
   }
 
   void _notify() {
@@ -170,6 +290,9 @@ class AnimatedSvgController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    // The picture owns the playback controller and may outlive this one, so the
+    // listener has to come off or it goes on firing into a disposed notifier.
+    _playback?.removeStatusListener(_handleLoopStatus);
     _playback = null;
     _progress.parent = null;
     super.dispose();
@@ -769,8 +892,18 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
       return;
     }
     // A looping animation never reports `completed`, so a frame index that goes
-    // backwards is what marks the end of a loop.
-    final bool wrapped = index < _frameIndex;
+    // backwards is what marks the end of a loop. Going forwards only, though.
+    // A backwards pass ends at `dismissed`, which [_handleStatus] has, and the
+    // index would be no use for it in any case: a looping animation shows its
+    // first frame at both ends of the range, so running backwards it appears to
+    // jump on the way out of the last frame as well as on the way into it.
+    //
+    // The direction is asked of the controller rather than of the playback
+    // controller's status, which has already turned to `dismissed` by the tick
+    // that carries the last value of a backwards pass — so reading it here
+    // would count that tick as a wrap and report the end of the pass twice.
+    final bool backwards = widget.controller?._isRunningBackwards ?? false;
+    final bool wrapped = index < _frameIndex && !backwards;
     setState(() {
       _frameIndex = index;
     });
@@ -780,7 +913,23 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
   }
 
   void _handleStatus(AnimationStatus status) {
+    final bool backwards = widget.controller?._isRunningBackwards ?? false;
     if (status == AnimationStatus.completed) {
+      // Running backwards, arriving at the last frame is where a pass begins
+      // rather than where one ended: either because [AnimatedSvgController
+      // .reverse] was called at the first frame, or because a backwards loop
+      // has just been started again from the end.
+      if (!backwards) {
+        widget.onCompleted?.call();
+      }
+      return;
+    }
+    // The first frame is where a backwards pass ends — every one of them,
+    // looping or not, since a backwards loop is started again from there. It is
+    // also where stopping and seeking to the start land, and arriving is
+    // reported the same way in all three cases, so asking the controller
+    // whether a backwards pass is under way is what tells them apart.
+    if (status == AnimationStatus.dismissed && backwards) {
       widget.onCompleted?.call();
     }
   }
