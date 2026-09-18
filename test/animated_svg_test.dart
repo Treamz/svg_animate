@@ -447,4 +447,278 @@ void main() {
       expect(_frameIndex(tester), 0);
     });
   });
+
+  group('playback speed', () {
+    testWidgets('scales how long a pass takes, and may be set before loading', (
+      WidgetTester tester,
+    ) async {
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+      controller.speed = 2;
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _spinner,
+          frameRate: 4,
+          width: 100,
+          height: 100,
+          controller: controller,
+        ),
+      );
+      await tester.pump();
+
+      expect(controller.speed, 2);
+      expect(controller.duration, const Duration(milliseconds: 500));
+
+      // A quarter of a second used to be a quarter of the way through.
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(_frameIndex(tester), 2);
+    });
+
+    testWidgets('takes effect on an animation that is already running', (
+      WidgetTester tester,
+    ) async {
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _spinner,
+          frameRate: 4,
+          width: 100,
+          height: 100,
+          controller: controller,
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(_frameIndex(tester), 1);
+
+      // A controller reads its duration when it is told to run, so this only
+      // lands because the speed setter tells it again.
+      controller.speed = 2;
+      // Telling the playback controller to run again restarts its ticker, and
+      // the frame that restarts it carries no elapsed time, the same as the
+      // frame after `play`.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 125));
+      expect(_frameIndex(tester), 2);
+    });
+
+    testWidgets('does not recompile the animation', (WidgetTester tester) async {
+      // The point of doing it this way: the frames are already compiled and
+      // only how long playback takes to walk through them changes.
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _spinner,
+          frameRate: 4,
+          width: 100,
+          height: 100,
+          controller: controller,
+        ),
+      );
+      await tester.pump();
+      final AnimatedSvgFrames before = _frameLoader(tester).frames;
+
+      controller.speed = 3;
+      await tester.pump();
+
+      expect(identical(_frameLoader(tester).frames, before), isTrue);
+      expect(svgAnimateCache.count, 1);
+    });
+
+    testWidgets('refuses a speed that is not positive', (WidgetTester tester) async {
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      expect(() => controller.speed = 0, throwsAssertionError);
+      expect(() => controller.speed = -2, throwsAssertionError);
+    });
+  });
+
+  group('playing backwards', () {
+    testWidgets('runs back towards the first frame and stops there', (WidgetTester tester) async {
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _oneShot,
+          frameRate: 4,
+          repeat: false,
+          width: 100,
+          height: 100,
+          controller: controller,
+          autoPlay: false,
+        ),
+      );
+      await tester.pump();
+      controller.seek(1);
+      await tester.pump();
+      expect(_frameIndex(tester), 3);
+
+      controller.reverse();
+      expect(controller.isReversed, isTrue);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frameIndex(tester), 2);
+
+      await tester.pumpAndSettle();
+      expect(_frameIndex(tester), 0);
+      expect(controller.isPlaying, isFalse);
+    });
+
+    testWidgets('reports the end of the pass once, not on every frame of it', (
+      WidgetTester tester,
+    ) async {
+      // The regression this guards. A frame index that moves down is what marks
+      // the end of a loop, and every tick of a backwards pass moves it down, so
+      // without the direction in that test `onCompleted` fires on all of them.
+      var completed = 0;
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _oneShot,
+          frameRate: 4,
+          repeat: false,
+          width: 100,
+          height: 100,
+          controller: controller,
+          autoPlay: false,
+          onCompleted: () => completed += 1,
+        ),
+      );
+      await tester.pump();
+      controller.seek(1);
+      await tester.pump();
+      // Seeking a one-shot animation to its last frame is arriving at its end
+      // in its own right, and is reported. What this test is about starts here.
+      completed = 0;
+
+      controller.reverse();
+      await tester.pumpAndSettle();
+
+      expect(_frameIndex(tester), 0);
+      expect(completed, 1);
+    });
+
+    testWidgets('starts from the last frame when it is already at the first', (
+      WidgetTester tester,
+    ) async {
+      // The mirror of [AnimatedSvgController.play] starting again from the
+      // beginning once an animation has run to its end.
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _oneShot,
+          frameRate: 4,
+          repeat: false,
+          width: 100,
+          height: 100,
+          controller: controller,
+          autoPlay: false,
+        ),
+      );
+      await tester.pump();
+      expect(_frameIndex(tester), 0);
+
+      controller.reverse();
+      await tester.pump();
+      expect(_frameIndex(tester), 3);
+    });
+
+    testWidgets('keeps looping an animation that repeats', (WidgetTester tester) async {
+      var completed = 0;
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _spinner,
+          frameRate: 4,
+          width: 100,
+          height: 100,
+          controller: controller,
+          autoPlay: false,
+          onCompleted: () => completed += 1,
+        ),
+      );
+      await tester.pump();
+
+      controller.reverse();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(_frameIndex(tester), 2);
+
+      // Past the start, where `repeat` would have been no use: it only ever
+      // runs forwards, so the next pass is started by hand.
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.isPlaying, isTrue);
+      expect(_frameIndex(tester), 3);
+      expect(completed, 1);
+    });
+
+    testWidgets('says so when the animation runs out on its own', (WidgetTester tester) async {
+      // `isPlaying` went to false and nothing told anybody, so a play button
+      // driven by the controller went on showing a pause icon.
+      var notifications = 0;
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+      controller.addListener(() => notifications += 1);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _oneShot,
+          frameRate: 4,
+          repeat: false,
+          width: 100,
+          height: 100,
+          controller: controller,
+        ),
+      );
+      await tester.pump();
+      final int whilePlaying = notifications;
+
+      await tester.pumpAndSettle();
+
+      expect(controller.isPlaying, isFalse);
+      expect(notifications, greaterThan(whilePlaying));
+    });
+
+    testWidgets('stop leaves playback pointing forwards again', (WidgetTester tester) async {
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(
+          _spinner,
+          frameRate: 4,
+          width: 100,
+          height: 100,
+          controller: controller,
+          autoPlay: false,
+        ),
+      );
+      await tester.pump();
+
+      controller.reverse();
+      await tester.pump();
+      controller.stop();
+      await tester.pump();
+      expect(controller.isReversed, isFalse);
+
+      controller.play();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(_frameIndex(tester), 1);
+    });
+  });
 }

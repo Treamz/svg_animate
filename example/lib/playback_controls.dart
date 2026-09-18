@@ -44,6 +44,18 @@ class _PlaybackControlsState extends State<PlaybackControls> {
   // the slider listens to `progress` instead and only the slider rebuilds.
   void _handleControllerChanged() => setState(() {});
 
+  /// Cycled through by the speed button, rather than offered as a menu, which
+  /// for three values is more to tap and more to look at.
+  static const List<double> _speeds = <double>[0.5, 1, 2];
+
+  void _cycleSpeed() {
+    final int next =
+        (_speeds.indexOf(widget.controller.speed) + 1) % _speeds.length;
+    // In a `setState` as well as through the listener, because a controller
+    // with no picture attached yet has nothing to notify about.
+    setState(() => widget.controller.speed = _speeds[next]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final AnimatedSvgController controller = widget.controller;
@@ -53,6 +65,11 @@ class _PlaybackControlsState extends State<PlaybackControls> {
           icon: Icon(controller.isPlaying ? Icons.pause : Icons.play_arrow),
           tooltip: controller.isPlaying ? 'Pause' : 'Play',
           onPressed: controller.isPlaying ? controller.pause : controller.play,
+        ),
+        IconButton(
+          icon: const Icon(Icons.fast_rewind),
+          tooltip: 'Play backwards',
+          onPressed: controller.reverse,
         ),
         IconButton(
           icon: const Icon(Icons.stop),
@@ -73,7 +90,14 @@ class _PlaybackControlsState extends State<PlaybackControls> {
             },
           ),
         ),
+        TextButton(
+          onPressed: _cycleSpeed,
+          child: Text(_describeSpeed(controller.speed)),
+        ),
       ],
     );
   }
 }
+
+String _describeSpeed(double speed) =>
+    speed == speed.roundToDouble() ? '${speed.toInt()}\u00d7' : '$speed\u00d7';

@@ -90,7 +90,18 @@ controller.play();
 controller.pause();
 controller.seek(0.5);                                  // 0.0 to 1.0
 controller.seekTo(const Duration(milliseconds: 500));
+
+controller.speed = 2.0;                                // 1.0 is the file's own
+controller.reverse();                                  // back towards frame one
 ```
+
+`speed` and `reverse` cost nothing: the frames are compiled once and are not
+compiled again, so only how long playback takes to walk through them changes.
+An animation that repeats keeps repeating backwards; one that does not stops at
+its first frame, and `onCompleted` is called there as it is at the end of a pass
+the other way. A speed far above 1 walks through the same frames in less time
+and so shows fewer of them per second — `frameRate` decides how many there are,
+and that is settled when the animation is compiled.
 
 `controller.progress` is a stable `Animation<double>`, so it can be handed to an
 `AnimatedBuilder` to follow playback frame by frame, even before loading
@@ -139,7 +150,7 @@ renderer cannot do them on its own:
 
 | | why |
 |---|---|
-| `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect |
+| `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect. Where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
 | Morphing the `d` attribute | those animations switch between values instead of interpolating |
 | `begin` on an event or another animation | there is no interactive document to fire it |
@@ -167,7 +178,7 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
 | `neverChanges` | an animation was declared, and every frame of it drew the same picture — something is animated that the renderer cannot express, a morphing `d` most often |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
-| `droppedFilter` | a `<filter>` is used, and filters are not drawn |
+| `droppedFilter` | a `<filter>` is used, and filters are not drawn. If the whole of it is one `feGaussianBlur`, the message carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
 
 Set `svgAnimateReportDiagnostics` to `false` to keep the printing out of a test

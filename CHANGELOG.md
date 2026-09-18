@@ -1,3 +1,29 @@
+## Unreleased
+
+* Adds `speed` and `reverse` to `AnimatedSvgController`. Playback could be
+  started, paused and seeked, but only ever ran forwards and only ever at the
+  timing the file declares, so showing an animation at half speed meant editing
+  the SVG. Neither costs anything: the frames are compiled once and are not
+  compiled again, so only how long playback takes to walk through them changes.
+  An animation that repeats keeps repeating backwards, which
+  `AnimationController.repeat` will not do on its own.
+
+* Tells a controller's listeners that playback has stopped when it stops
+  because the animation ran out. `isPlaying` went to false and nothing said so,
+  so a play button driven by an `AnimatedSvgController` went on showing a pause
+  icon after the animation it drives had finished, until something else happened
+  to rebuild it.
+
+* Says what to do about a dropped `<filter>`, where there is something to do.
+  `vector_graphics` cannot blur one element inside a picture, but Flutter can
+  blur the picture, and `AnimatedSvgPicture` already takes an `imageBuilder`. A
+  filter that is a single `feGaussianBlur` — which is what an exported glow or
+  soft shadow usually is — now reports the `ImageFiltered` that approximates it,
+  carrying the `stdDeviation` the file asked for. Anything else, including a
+  document that uses more than one filter, goes on saying that nothing can be
+  done rather than sending somebody after a substitution that will not look like
+  what they asked for.
+
 ## 0.3.8
 
 * Adds `precacheAnimatedSvg`, which compiles an animation into the shared cache
