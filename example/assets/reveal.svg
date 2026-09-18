@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48" width="120" height="48">
+  <!-- Text, revealed by animating the width of the rect inside a `clipPath`.
+       The clip is re-resolved for every frame, so the wipe is geometry rather
+       than an effect. -->
+  <defs>
+    <clipPath id="wipe">
+      <rect x="0" y="0" width="0" height="48">
+        <animate attributeName="width" values="0;120;120;0" keyTimes="0;0.45;0.8;1"
+            dur="3s" calcMode="spline"
+            keySplines="0.4 0 0.2 1;0 0 1 1;0.4 0 0.2 1" repeatCount="indefinite"/>
+      </rect>
+    </clipPath>
+  </defs>
+  <text x="60" y="31" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
+      font-size="22" font-weight="bold" fill="#e3f2fd">svg_animate</text>
+  <g clip-path="url(#wipe)">
+    <text x="60" y="31" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
+        font-size="22" font-weight="bold" fill="#0d47a1">svg_animate</text>
+  </g>
+</svg>

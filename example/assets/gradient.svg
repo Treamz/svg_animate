@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48" width="120" height="48">
+  <!-- The gradient itself is animated: both stop colours and where the stops
+       sit. Each frame is compiled with the gradient it had at that moment. -->
+  <defs>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0d47a1">
+        <animate attributeName="stop-color" values="#0d47a1;#42a5f5;#0d47a1"
+            dur="3s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="0.5" stop-color="#42a5f5">
+        <animate attributeName="offset" values="0.15;0.85;0.15" dur="3s"
+            calcMode="spline" keyTimes="0;0.5;1"
+            keySplines="0.4 0 0.2 1;0.4 0 0.2 1" repeatCount="indefinite"/>
+        <animate attributeName="stop-color" values="#42a5f5;#e3f2fd;#42a5f5"
+            dur="3s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="1" stop-color="#0d47a1"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="8" width="116" height="32" rx="8" fill="url(#sweep)"/>
+</svg>

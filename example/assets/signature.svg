@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48" width="120" height="48">
+  <!-- Drawing a path on. The dash pattern is a list of two numbers and the
+       whole list is animated: the dash grows from nothing to the length of the
+       path while the gap after it shrinks to nothing. -->
+  <path d="M6 34 C18 6 26 6 32 20 C38 34 46 34 52 20 C58 6 70 6 76 24 C82 42 100 40 114 16"
+      fill="none" stroke="#42a5f5" stroke-width="4" stroke-linecap="round"
+      stroke-dasharray="0 260">
+    <animate attributeName="stroke-dasharray" values="0 260;260 0;260 0"
+        keyTimes="0;0.75;1" dur="2.6s" calcMode="spline"
+        keySplines="0.4 0 0.2 1;0 0 1 1" repeatCount="indefinite"/>
+  </path>
+</svg>

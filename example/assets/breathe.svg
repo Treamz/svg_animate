@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- `animation-direction: alternate` plays the keyframes forwards and then
+       backwards, and each petal is held back by its own `animation-delay`. -->
+  <style>
+    .petal {
+    transform-origin: center;
+    animation: open 1.4s ease-in-out infinite alternate;
+    }
+    .p2 { animation-delay: 0.18s }
+    .p3 { animation-delay: 0.36s }
+    @keyframes open {
+    from { transform: scale(0.35); opacity: 0.35 }
+    to { transform: scale(1); opacity: 1 }
+    }
+  </style>
+  <circle class="petal" cx="24" cy="24" r="20" fill="#e3f2fd"/>
+  <circle class="petal p2" cx="24" cy="24" r="13" fill="#42a5f5"/>
+  <circle class="petal p3" cx="24" cy="24" r="6" fill="#0d47a1"/>
+</svg>
