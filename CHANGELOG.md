@@ -1,4 +1,4 @@
-## Unreleased
+## 0.4.0
 
 * Adds `speed` and `reverse` to `AnimatedSvgController`. Playback could be
   started, paused and seeked, but only ever ran forwards and only ever at the
