@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48" width="120" height="48">
-  <!-- Text, revealed by animating the width of the rect inside a `clipPath`.
-       The clip is re-resolved for every frame, so the wipe is geometry rather
-       than an effect. -->
+  <!-- A clipPath whose rect widens and narrows again, wiping the bars in and
+       out. The clip is resolved again for every frame, so the reveal is
+       geometry rather than an effect.
+
+       The bars are shapes on purpose. A clip does not reach `<text>` through
+       this renderer: the letters draw in full whatever the clip says. -->
   <defs>
     <clipPath id="wipe">
       <rect x="0" y="0" width="0" height="48">
@@ -11,10 +14,20 @@
       </rect>
     </clipPath>
   </defs>
-  <text x="60" y="31" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
-      font-size="22" font-weight="bold" fill="#e3f2fd">svg_animate</text>
-  <g clip-path="url(#wipe)">
-    <text x="60" y="31" text-anchor="middle" font-family="Helvetica, Arial, sans-serif"
-        font-size="22" font-weight="bold" fill="#0d47a1">svg_animate</text>
+  <g fill="#e3f2fd">
+    <rect x="6" y="30" width="14" height="12" rx="3"/>
+    <rect x="26" y="20" width="14" height="22" rx="3"/>
+    <rect x="46" y="8" width="14" height="34" rx="3"/>
+    <rect x="66" y="16" width="14" height="26" rx="3"/>
+    <rect x="86" y="26" width="14" height="16" rx="3"/>
+    <rect x="106" y="12" width="8" height="30" rx="3"/>
+  </g>
+  <g clip-path="url(#wipe)" fill="#0d47a1">
+    <rect x="6" y="30" width="14" height="12" rx="3"/>
+    <rect x="26" y="20" width="14" height="22" rx="3"/>
+    <rect x="46" y="8" width="14" height="34" rx="3"/>
+    <rect x="66" y="16" width="14" height="26" rx="3"/>
+    <rect x="86" y="26" width="14" height="16" rx="3"/>
+    <rect x="106" y="12" width="8" height="30" rx="3"/>
   </g>
 </svg>

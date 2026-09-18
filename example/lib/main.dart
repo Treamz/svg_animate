@@ -34,8 +34,9 @@ const List<Sample> _samples = <Sample>[
   Sample(
     'assets/reveal.svg',
     'Wiped in',
-    'Text inside a clipPath whose rect gets wider. The clip is resolved again for '
-        'every frame, so the wipe is geometry rather than an effect.',
+    'Bars revealed by a clipPath whose rect gets wider and then narrows again. '
+        'The clip is resolved for every frame, so the wipe is geometry rather '
+        'than an effect.',
   ),
   Sample(
     'assets/gradient.svg',
