@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- A CSS motion path rather than a SMIL one: `offset-path` with
+       `offset-distance` animated, and `offset-rotate` turning the shape to
+       face the way it is going. -->
+  <style>
+    .comet {
+    offset-path: path("M24 6 A18 18 0 1 1 23.9 6");
+    offset-rotate: auto;
+    animation: travel 2.2s linear infinite;
+    }
+    @keyframes travel {
+    from { offset-distance: 0% }
+    to { offset-distance: 100% }
+    }
+  </style>
+  <circle cx="24" cy="24" r="18" fill="none" stroke="#e3f2fd" stroke-width="2"/>
+  <polygon class="comet" points="-9,-3 0,0 -9,3" fill="#0d47a1"/>
+</svg>
