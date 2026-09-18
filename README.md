@@ -153,6 +153,7 @@ renderer cannot do them on its own:
 | `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect. Where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
 | Morphing the `d` attribute | those animations switch between values instead of interpolating |
+| `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach |
 | Animating `stroke-dashoffset` | `vector_graphics` carries no dash offset, so the value changes and the drawing does not. To draw a path on, animate `stroke-dasharray` instead: growing it from `0 L` to `L 0`, where `L` is the length of the path, is the same effect and does compile. The example's "Drawn on" sample does it that way |
 | `begin` on an event or another animation | there is no interactive document to fire it |
 | CSS pseudo-classes such as `:hover` | same |

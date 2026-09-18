@@ -95,6 +95,30 @@ void main() {
     });
   });
 
+  // Three techniques where what the markup says and what the renderer draws
+  // are not obviously the same thing. The wipe is here because it was not: the
+  // sample used to clip `<text>`, the clip did not reach the letters, and every
+  // frame drew the whole word. Nothing but pixels was going to say so — the
+  // values changed on every frame, so the animation looked alive from the
+  // outside and the diagnostics had nothing to report.
+  group('techniques worth looking at', () {
+    testWidgets('a clip part way across the bars', (WidgetTester tester) async {
+      await expectFrame(tester, asset('reveal'), 0.15, 'reveal_early');
+    });
+
+    testWidgets('and further across, which has to differ', (WidgetTester tester) async {
+      await expectFrame(tester, asset('reveal'), 0.35, 'reveal_later');
+    });
+
+    testWidgets('a path drawn on by its dash array', (WidgetTester tester) async {
+      await expectFrame(tester, asset('signature'), 0.3, 'signature');
+    });
+
+    testWidgets('a gradient whose own stops have moved', (WidgetTester tester) async {
+      await expectFrame(tester, asset('gradient'), 0.4, 'gradient');
+    });
+  });
+
   group('the other shapes the example draws', () {
     testWidgets('spinner', (WidgetTester tester) async {
       await expectFrame(tester, asset('spinner'), 0.25, 'spinner', size: const Size(120, 120));
