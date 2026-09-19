@@ -182,6 +182,7 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
 | `droppedFilter` | a `<filter>` is used, and filters are not drawn. If the whole of it is one `feGaussianBlur`, the message carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
+| `expensive` | the compiled animation came to more than 4 MB. The message says how large, over how many frames, how many of those are different pictures, and which of `frameRate` and `maxFrames` changes it |
 
 Set `svgAnimateReportDiagnostics` to `false` to keep the printing out of a test
 that loads such a file deliberately.
@@ -262,6 +263,11 @@ debugPrint('${frames.frameCount} frames, ${frames.distinctFrameCount} distinct, 
 
 On the web there are no isolates, so compilation runs on the main thread; prefer
 a lower `frameRate` for long animations there.
+
+Editing an SVG and hot reloading shows the edit. An animation is cached under
+what identifies its source rather than under its contents, so a reload throws
+away what was compiled from the version before it and compiles the file again.
+Debug builds only.
 
 Compiling is what the wait is made of, and it can be done before anything is
 waiting. `precacheAnimatedSvg` compiles an animation into the same cache the

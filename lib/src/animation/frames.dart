@@ -258,6 +258,37 @@ int _sharedPrefixLength(List<Uint8List> frames) {
   return limit;
 }
 
+/// How much compiled animation is worth saying something about.
+///
+/// A fifth of what the shared cache holds by default, so at this size fewer
+/// than five animations fit in it at once and the rest are evicted to make room
+/// for this one. It is a round number rather than a measured threshold: the
+/// point is to say what an animation cost while there is still a chance to
+/// change it, not to draw a line between fine and not fine.
+const int _costlyCompiledByteSize = 4 << 20;
+
+/// What a large animation cost, and which knob changes it.
+///
+/// Compiling is the expensive part of this package and its cost is invisible:
+/// the animation plays, and the bill arrives as memory, as a slow first frame,
+/// or on the web as a frozen tab, none of which points back at the SVG. This
+/// says the number while the SVG is still in front of whoever chose it.
+SvgAnimateDiagnostic? _costDiagnostic(AnimatedSvgFrames frames) {
+  if (frames.compiledByteSize < _costlyCompiledByteSize) {
+    return null;
+  }
+  final String size = (frames.compiledByteSize / (1024 * 1024)).toStringAsFixed(1);
+  return SvgAnimateDiagnostic(
+    SvgAnimateDiagnosticKind.expensive,
+    'This animation compiled to $size MB, over ${frames.frameCount} frames of which '
+    '${frames.distinctFrameCount} are different pictures. The shared cache holds 20 MB '
+    'in total by default, so one of this size pushes everything else out of it'
+    '${kIsWeb ? ', and on the web the compiling happened on the thread that draws' : ''}. '
+    'Halving `frameRate` roughly halves both the time and the memory; `maxFrames` caps '
+    'the count outright. Neither changes how long the animation runs for.',
+  );
+}
+
 /// Compiles the animation in [source] into one vector graphic per frame.
 ///
 /// The work happens in a background isolate on platforms that support them, in
@@ -299,13 +330,11 @@ Future<AnimatedSvgFrames> compileAnimatedSvgFrames(
         loops: document.loops,
         diagnostics: diagnostics,
       );
-      // Only knowable once the frames exist: the document declared an animation
-      // and every sample of it came out as the same picture. Reported by
-      // rebuilding the wrapper rather than the frames, which have already been
-      // split and compared and would otherwise be split and compared again.
-      if (compiled.frameCount > 1 && compiled.distinctFrameCount == 1) {
-        return compiled._withDiagnostics(<SvgAnimateDiagnostic>[
-          ...diagnostics,
+      // The rest is only knowable once the frames exist. Reported by rebuilding
+      // the wrapper rather than the frames, which have already been split and
+      // compared and would otherwise be split and compared again.
+      final afterCompiling = <SvgAnimateDiagnostic>[
+        if (compiled.frameCount > 1 && compiled.distinctFrameCount == 1)
           const SvgAnimateDiagnostic(
             SvgAnimateDiagnosticKind.neverChanges,
             'This SVG declares an animation, and every frame it was sampled at drew '
@@ -314,9 +343,15 @@ Future<AnimatedSvgFrames> compileAnimatedSvgFrames(
             'values change and nothing about the drawing does. It is treated as a '
             'still picture and no ticker is started.',
           ),
-        ]);
+      ];
+      final SvgAnimateDiagnostic? cost = _costDiagnostic(compiled);
+      if (cost != null) {
+        afterCompiling.add(cost);
       }
-      return compiled;
+      if (afterCompiling.isEmpty) {
+        return compiled;
+      }
+      return compiled._withDiagnostics(<SvgAnimateDiagnostic>[...diagnostics, ...afterCompiling]);
     },
     source,
     debugLabel: 'Compile animated SVG',
