@@ -20,6 +20,9 @@ enum SvgAnimateDiagnosticKind {
 
   /// The animation is long enough that it was sampled below the requested rate.
   reducedFrameRate,
+
+  /// The compiled animation is large enough to be worth deciding about.
+  expensive,
 }
 
 /// Whether an [AnimatedSvgPicture] prints what an SVG asked for that will not

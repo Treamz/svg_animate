@@ -1,3 +1,23 @@
+## Unreleased
+
+* Recompiles an animation when the app is hot reloaded, so that editing an SVG
+  and reloading shows the edit. An animation is cached under what identifies its
+  source — an asset's name, a file's path — and never under its contents, so a
+  file that had changed on disk went on finding the animation compiled from what
+  it used to say, and only a full restart cleared it. Flutter has the same
+  problem with images and solves it the same way round: `PaintingBinding.evict`
+  throws away every decoded image when an asset changes. Debug builds only;
+  there is no hot reload to serve in a release build and recompiling there would
+  be pure cost.
+
+* Adds a diagnostic for an animation that compiled to more than 4 MB. It says
+  how large it is, over how many frames, how many of those are different
+  pictures, and which of `frameRate` and `maxFrames` changes it. Compiling is
+  where this package spends, and the bill arrives as memory, as a slow first
+  frame, or on the web as a frozen tab — none of which points back at the SVG
+  that caused it. `SvgAnimateDiagnosticKind` gains a value, so a `switch` over
+  it that was exhaustive is not any more.
+
 ## 0.4.0
 
 * Adds `speed` and `reverse` to `AnimatedSvgController`. Playback could be

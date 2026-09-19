@@ -715,6 +715,28 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
     }
   }
 
+  /// Recompiles the animation on a hot reload, so that an edited SVG shows.
+  ///
+  /// Without this, editing an SVG and reloading shows the version before it.
+  /// An animation is cached under what identifies its source — an asset's name,
+  /// a file's path — and never under its contents, so a file that has changed
+  /// on disk goes on finding the animation compiled from what it used to say.
+  /// Flutter has the same problem with images and solves it the same way round:
+  /// `PaintingBinding.evict` throws away every decoded image when an asset
+  /// changes.
+  ///
+  /// Inside an `assert` so that it is gone from a release build entirely, where
+  /// there is no hot reload to serve and recompiling would be pure cost.
+  @override
+  void reassemble() {
+    super.reassemble();
+    assert(() {
+      svgAnimateCache.evict(_cacheKey());
+      _load();
+      return true;
+    }());
+  }
+
   @override
   void dispose() {
     widget.controller?._detach();

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:svg_animate/svg_animate.dart';
 import 'package:svg_animate/src/animation/frames.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,11 +25,34 @@ const String _oneShot = '''
 </svg>
 ''';
 
+/// The same one-shot animation, twice as long.
+///
+/// Used as the edit: a duration is the cheapest thing to tell apart from the
+/// outside without looking at pixels.
+const String _oneShotLonger = '''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" fill="#ff0000" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="2s" fill="freeze"/>
+  </rect>
+</svg>
+''';
+
 const String _static = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <rect width="100" height="100" fill="#ff0000"/>
 </svg>
 ''';
+
+/// A bundle whose asset can be edited, the way a file on disk can be.
+class _EditableBundle extends CachingAssetBundle {
+  _EditableBundle(this.markup);
+
+  String markup;
+
+  @override
+  Future<ByteData> load(String key) async =>
+      ByteData.sublistView(Uint8List.fromList(utf8.encode(markup)));
+}
 
 /// A loader that does not provide its markup until [completer] is completed,
 /// so that tests can observe the widget while it is still loading.
@@ -303,6 +328,49 @@ void main() {
 
     expect(_frameIndex(tester), 2);
     expect(svgAnimateCache.count, 1);
+  });
+
+  group('a hot reload', () {
+    Widget picture(_EditableBundle bundle) => DefaultAssetBundle(
+      bundle: bundle,
+      child: AnimatedSvgPicture.asset('a.svg', frameRate: 4, width: 100, height: 100),
+    );
+
+    testWidgets('shows an SVG that has been edited since it was compiled', (
+      WidgetTester tester,
+    ) async {
+      final bundle = _EditableBundle(_oneShot);
+      await tester.pumpWidget(picture(bundle));
+      await tester.pump();
+      expect(_frameLoader(tester).frames.duration, const Duration(seconds: 1));
+
+      bundle.markup = _oneShotLonger;
+      bundle.clear();
+      // Started rather than awaited: the future it returns completes at the end
+      // of a frame, and in a test nothing pumps one while the await is holding.
+      final Future<void> reloaded = tester.binding.reassembleApplication();
+      await tester.pump();
+      await reloaded;
+      await tester.pump();
+
+      expect(_frameLoader(tester).frames.duration, const Duration(seconds: 2));
+    });
+
+    testWidgets('which a rebuild on its own does not', (WidgetTester tester) async {
+      // The other half, and the reason the one above is worth having: the key
+      // an animation is cached under is made of the asset's name and not of its
+      // contents, so nothing about rebuilding notices that the file changed.
+      final bundle = _EditableBundle(_oneShot);
+      await tester.pumpWidget(picture(bundle));
+      await tester.pump();
+
+      bundle.markup = _oneShotLonger;
+      bundle.clear();
+      await tester.pumpWidget(picture(bundle));
+      await tester.pump();
+
+      expect(_frameLoader(tester).frames.duration, const Duration(seconds: 1));
+    });
   });
 
   group('AnimatedSvgController', () {

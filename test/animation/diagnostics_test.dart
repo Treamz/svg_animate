@@ -9,6 +9,29 @@ Future<List<SvgAnimateDiagnostic>> diagnose(String svg, {int maxFrames = 300}) a
 Set<SvgAnimateDiagnosticKind> kinds(List<SvgAnimateDiagnostic> diagnostics) =>
     diagnostics.map((SvgAnimateDiagnostic d) => d.kind).toSet();
 
+/// An animation big enough to be worth warning about, built rather than
+/// written out.
+///
+/// The transform is on the group on purpose: the compiler bakes transforms into
+/// the points, so every frame carries its own copy of every path and the size
+/// is real rather than an artefact of how the frames are stored.
+String heavy({int paths = 40, int points = 400}) {
+  final buffer = StringBuffer(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">'
+    '<g><animateTransform attributeName="transform" type="translate" '
+    'values="0 0;40 40" dur="1s" repeatCount="indefinite"/>',
+  );
+  for (var path = 0; path < paths; path++) {
+    buffer.write('<path fill="none" stroke="#123456" d="M0 $path');
+    for (var point = 1; point < points; point++) {
+      buffer.write(' L$point ${(path + point) % 1000}');
+    }
+    buffer.write('"/>');
+  }
+  buffer.write('</g></svg>');
+  return buffer.toString();
+}
+
 const String movingRect = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <rect width="10" height="10" fill="#f00">
@@ -177,6 +200,29 @@ void main() {
 </svg>''');
 
       expect(found, isEmpty);
+    });
+
+    test('says what a large animation cost, and which knob changes it', () async {
+      // Compiling is where this package spends, and the bill arrives as memory,
+      // as a slow first frame, or on the web as a frozen tab — none of which
+      // points back at the SVG that caused it.
+      final List<SvgAnimateDiagnostic> found = await diagnose(heavy());
+
+      expect(kinds(found), contains(SvgAnimateDiagnosticKind.expensive));
+      final SvgAnimateDiagnostic cost = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.expensive,
+      );
+      expect(cost.message, contains(' MB'));
+      expect(cost.message, contains('60 frames'));
+      expect(cost.message, contains('frameRate'), reason: 'saying it is big is only half of it');
+      expect(cost.message, contains('maxFrames'));
+    });
+
+    test('says nothing about one of an ordinary size', () async {
+      expect(
+        kinds(await diagnose(movingRect)),
+        isNot(contains(SvgAnimateDiagnosticKind.expensive)),
+      );
     });
 
     test('reports an animation whose every frame draws the same picture', () async {
