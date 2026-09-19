@@ -49,6 +49,26 @@ const int _maximumSourceBytes = 4 << 20;
 const String _exampleUrl =
     'https://raw.githubusercontent.com/Treamz/svg_animate/main/example/assets/spinner.svg';
 
+/// An SVG that plays, and asks for something that will not be drawn.
+///
+/// Deliberately not in `assets/`: everything under there is checked to compile
+/// with no diagnostics at all, and this one exists to produce one. A visitor
+/// with nothing of their own to try can still see what the package says when
+/// a file asks for more than the renderer can give.
+const String filterExample = '''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+  </defs>
+  <circle cx="60" cy="60" r="26" fill="#42a5f5" filter="url(#glow)">
+    <animate attributeName="r" values="18;30;18" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="60" cy="60" r="12" fill="#0d47a1"/>
+</svg>
+''';
+
 class _PlaygroundScreenState extends State<PlaygroundScreen> {
   final AnimatedSvgController _controller = AnimatedSvgController();
   final TextEditingController _url = TextEditingController(text: _exampleUrl);
@@ -187,6 +207,21 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
     await _show(SvgAnimateNetworkLoader(url), url);
   }
 
+  /// Loads the bundled SVG that asks for a blur.
+  ///
+  /// Into the text field as well as into the picture, so that what produced the
+  /// diagnostic can be read and edited rather than only described.
+  Future<void> _loadFilterExample() async {
+    setState(() {
+      _source = _Source.markup;
+      _markup.text = filterExample;
+    });
+    await _show(
+      const SvgAnimateStringLoader(filterExample),
+      'an SVG asking for a blur',
+    );
+  }
+
   Future<void> _loadMarkup() async {
     final String markup = _markup.text.trim();
     if (markup.isEmpty) {
@@ -224,7 +259,9 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
         ),
         const SizedBox(height: 16),
         _input(),
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
+        _ExampleHint(onPressed: _loadFilterExample),
+        const SizedBox(height: 16),
         _result(),
       ],
     );
@@ -351,6 +388,32 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
           'it in instead — nothing can refuse that.';
     }
     return described;
+  }
+}
+
+/// Offers the bundled example to somebody who has nothing of their own.
+///
+/// What it is there for is the second half: an SVG that plays and still does
+/// not look right is the case this page is worth opening for, and a visitor
+/// with a working file of their own never sees it.
+class _ExampleHint extends StatelessWidget {
+  const _ExampleHint({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: <Widget>[
+        Text(
+          'Nothing to hand? Try one that asks for a blur, which cannot be drawn:',
+          style: theme.textTheme.bodySmall,
+        ),
+        TextButton(onPressed: onPressed, child: const Text('load it')),
+      ],
+    );
   }
 }
 
