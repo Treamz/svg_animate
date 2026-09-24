@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.0
 
 * Names what was animated when an animation draws the same picture every frame,
   and says which layer dropped it. `neverChanges` said only that something the
