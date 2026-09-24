@@ -1,5 +1,22 @@
 ## Unreleased
 
+* Names what was animated when an animation draws the same picture every frame,
+  and says which layer dropped it. `neverChanges` said only that something the
+  renderer could not express was animated, which sends somebody back to read the
+  whole file. It now lists the attributes, and for the two known cases says
+  where each one goes wrong: an animated `d` never reaches the frames, because
+  path data is not a value this package interpolates, while an animated
+  `stroke-dashoffset` reaches them correctly and is dropped by
+  `vector_graphics`, which carries no dash offset. The dash offset case also
+  carries the way round it — animating `stroke-dasharray` from `0 L` to `L 0`
+  draws a path on and does compile.
+
+* Adds a diagnostic for a `clip-path` over `<text>`. The clip does not reach the
+  letters: they are drawn in full whatever it says, so a wipe or a reveal over
+  text stays fully drawn from the first frame to the last, with every value
+  changing as it should and nothing to report. Clipping shapes works, so the
+  same effect over shapes, or the text converted to paths, both compile.
+
 * Recompiles an animation when the app is hot reloaded, so that editing an SVG
   and reloading shows the edit. An animation is cached under what identifies its
   source — an asset's name, a file's path — and never under its contents, so a

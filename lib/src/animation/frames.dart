@@ -258,6 +258,43 @@ int _sharedPrefixLength(List<Uint8List> frames) {
   return limit;
 }
 
+/// What was animated, when animating it changed nothing about the drawing.
+///
+/// Naming the attributes is most of the value here. "Something the renderer
+/// cannot express" sends somebody back to read the whole file; "stroke-dashoffset"
+/// sends them to the one line that is wrong.
+///
+/// The two that are known are known to fail in different places, and saying
+/// which saves the search: a `d` never reaches the markup, because path data is
+/// not a value this package interpolates, while a dash offset reaches it
+/// correctly and is dropped by the renderer underneath.
+SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
+  final buffer = StringBuffer(
+    'This SVG declares an animation, and every frame it was sampled at drew exactly '
+    'the same picture: the values change and nothing about the drawing does. It is '
+    'treated as a still picture and no ticker is started.',
+  );
+  if (animated.isNotEmpty) {
+    final List<String> names = animated.toList()..sort();
+    buffer.write(' What it animates: ${names.map((String name) => '"$name"').join(', ')}.');
+  }
+  if (animated.contains('stroke-dashoffset')) {
+    buffer.write(
+      ' The dash offset is written into every frame correctly and then dropped: '
+      'vector_graphics carries no dash offset. To draw a path on, animate '
+      '"stroke-dasharray" instead — growing it from "0 L" to "L 0", where L is the '
+      'length of the path, is the same effect and does compile.',
+    );
+  }
+  if (animated.contains('d')) {
+    buffer.write(
+      ' Path data is not a value this package interpolates, so an animated "d" never '
+      'reaches the frames at all: the element keeps the "d" it was authored with.',
+    );
+  }
+  return SvgAnimateDiagnostic(SvgAnimateDiagnosticKind.neverChanges, buffer.toString());
+}
+
 /// How much compiled animation is worth saying something about.
 ///
 /// A fifth of what the shared cache holds by default, so at this size fewer
@@ -335,14 +372,7 @@ Future<AnimatedSvgFrames> compileAnimatedSvgFrames(
       // compared and would otherwise be split and compared again.
       final afterCompiling = <SvgAnimateDiagnostic>[
         if (compiled.frameCount > 1 && compiled.distinctFrameCount == 1)
-          const SvgAnimateDiagnostic(
-            SvgAnimateDiagnosticKind.neverChanges,
-            'This SVG declares an animation, and every frame it was sampled at drew '
-            'exactly the same picture. Something is being animated that the '
-            'renderer cannot express — a morphing "d" is the usual one — so the '
-            'values change and nothing about the drawing does. It is treated as a '
-            'still picture and no ticker is started.',
-          ),
+          _neverChangesDiagnostic(document.animatedAttributes),
       ];
       final SvgAnimateDiagnostic? cost = _costDiagnostic(compiled);
       if (cost != null) {

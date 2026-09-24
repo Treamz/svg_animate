@@ -238,6 +238,81 @@ void main() {
       expect(found.last.message, contains('"d"'));
     });
 
+    test('names an animated stroke-dashoffset, and the way round it', () async {
+      // The one worth naming. Drawing a path on is normally written this way,
+      // the values are written into every frame correctly, and the renderer
+      // carries no dash offset — so nothing moves and nothing says why.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20">
+  <path d="M5 10 L95 10" stroke="#f00" stroke-width="4" fill="none"
+        stroke-dasharray="90" stroke-dashoffset="90">
+    <animate attributeName="stroke-dashoffset" from="90" to="0" dur="1s"
+             repeatCount="indefinite"/>
+  </path>
+</svg>''');
+
+      final SvgAnimateDiagnostic still = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      );
+      expect(still.message, contains('"stroke-dashoffset"'));
+      expect(still.message, contains('"stroke-dasharray"'));
+      expect(still.message, contains('0 L'), reason: 'the way round it, not just the name');
+    });
+
+    test('says an animated d never reaches the frames at all', () async {
+      // A different failure from the dash offset, and worth telling apart: this
+      // one never gets written, rather than being written and then dropped.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M0 0 L10 0 L10 10 Z" fill="#f00">
+    <animate attributeName="d" dur="1s" repeatCount="indefinite"
+             values="M0 0 L10 0 L10 10 Z;M0 0 L90 0 L90 90 Z"/>
+  </path>
+</svg>''');
+
+      final SvgAnimateDiagnostic still = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      );
+      expect(still.message, contains('"d"'));
+      expect(still.message, contains('authored'));
+    });
+
+    test('reports a clip over text, which will not reach it', () async {
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48">
+  <defs><clipPath id="w"><rect x="0" y="0" width="60" height="48">
+    <animate attributeName="width" values="0;120" dur="1s" repeatCount="indefinite"/>
+  </rect></clipPath></defs>
+  <g clip-path="url(#w)"><text x="10" y="30">hello</text></g>
+</svg>''');
+
+      expect(kinds(found), contains(SvgAnimateDiagnosticKind.unclippedText));
+    });
+
+    test('and finds it through a style as well as an attribute', () async {
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48">
+  <defs><clipPath id="w"><rect x="0" y="0" width="60" height="48">
+    <animate attributeName="width" values="0;120" dur="1s" repeatCount="indefinite"/>
+  </rect></clipPath></defs>
+  <text x="10" y="30" style="clip-path: url(#w)">hello</text>
+</svg>''');
+
+      expect(kinds(found), contains(SvgAnimateDiagnosticKind.unclippedText));
+    });
+
+    test('says nothing when the clip is over shapes, which it does reach', () async {
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 48">
+  <defs><clipPath id="w"><rect x="0" y="0" width="60" height="48">
+    <animate attributeName="width" values="0;120" dur="1s" repeatCount="indefinite"/>
+  </rect></clipPath></defs>
+  <g clip-path="url(#w)"><rect width="120" height="48" fill="#f00"/></g>
+</svg>''');
+
+      expect(found, isEmpty);
+    });
+
     test('reports being sampled below the requested rate, and says the rate', () async {
       // Two seconds at 60 fps wants 120 frames; 30 are allowed.
       final List<SvgAnimateDiagnostic> found = await diagnose('''
