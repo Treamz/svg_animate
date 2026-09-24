@@ -152,8 +152,8 @@ renderer cannot do them on its own:
 |---|---|
 | `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect. Where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
-| Morphing the `d` attribute | those animations switch between values instead of interpolating |
-| `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach |
+| Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
+| `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
 | Animating `stroke-dashoffset` | `vector_graphics` carries no dash offset, so the value changes and the drawing does not. To draw a path on, animate `stroke-dasharray` instead: growing it from `0 L` to `L 0`, where `L` is the length of the path, is the same effect and does compile. The example's "Drawn on" sample does it that way |
 | `begin` on an event or another animation | there is no interactive document to fire it |
 | CSS pseudo-classes such as `:hover` | same |
@@ -178,10 +178,11 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | kind | what it means |
 |---|---|
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
-| `neverChanges` | an animation was declared, and every frame of it drew the same picture — something is animated that the renderer cannot express, a morphing `d` most often |
+| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and for the two known cases says which layer dropped them: an animated `d` never reaches the frames, while a `stroke-dashoffset` reaches them and is dropped by the renderer |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
 | `droppedFilter` | a `<filter>` is used, and filters are not drawn. If the whole of it is one `feGaussianBlur`, the message carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
+| `unclippedText` | a `clip-path` applies over `<text>`, which it will not reach; the letters draw in full from the first frame to the last |
 | `expensive` | the compiled animation came to more than 4 MB. The message says how large, over how many frames, how many of those are different pictures, and which of `frameRate` and `maxFrames` changes it |
 
 Set `svgAnimateReportDiagnostics` to `false` to keep the printing out of a test

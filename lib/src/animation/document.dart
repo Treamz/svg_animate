@@ -247,6 +247,14 @@ class AnimatedSvgDocument {
   List<SvgAnimateDiagnostic> get diagnostics =>
       diagnoseDocument(_document, hasAnimation: _targets.isNotEmpty);
 
+  /// The names of the attributes this document animates.
+  ///
+  /// Read when the frames turn out to be identical, so that what was animated
+  /// can be named instead of guessed at.
+  Set<String> get animatedAttributes => <String>{
+    for (final _AnimationTarget target in _targets) target.attributeName,
+  };
+
   /// How long one full loop of the document takes.
   ///
   /// [Duration.zero] if the document declares no animation this package can

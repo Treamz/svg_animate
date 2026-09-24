@@ -23,6 +23,9 @@ enum SvgAnimateDiagnosticKind {
 
   /// The compiled animation is large enough to be worth deciding about.
   expensive,
+
+  /// A `clip-path` is applied over text, which it will not reach.
+  unclippedText,
 }
 
 /// Whether an [AnimatedSvgPicture] prints what an SVG asked for that will not
@@ -103,6 +106,23 @@ List<SvgAnimateDiagnostic> diagnoseDocument(XmlDocument document, {required bool
     );
   }
 
+  for (final XmlElement text in document.descendantElements) {
+    if (text.name.local != 'text' || !_isClipped(text)) {
+      continue;
+    }
+    diagnostics.add(
+      const SvgAnimateDiagnostic(
+        SvgAnimateDiagnosticKind.unclippedText,
+        'A clip-path applies to a <text> element here. The clip does not reach the '
+        'letters through this renderer: they are drawn in full whatever it says, so a '
+        'wipe or a reveal over text stays fully drawn from the first frame to the last. '
+        'Clipping shapes does work — the same effect over shapes, or the text converted '
+        'to paths, both compile.',
+      ),
+    );
+    break;
+  }
+
   final Set<String> filters = _usedFilters(document);
   if (filters.isNotEmpty) {
     final String opening =
@@ -120,6 +140,25 @@ List<SvgAnimateDiagnostic> diagnoseDocument(XmlDocument document, {required bool
 
   return diagnostics;
 }
+
+/// Whether [element] or anything it sits inside asks to be clipped.
+bool _isClipped(XmlElement element) {
+  for (XmlNode? node = element; node != null; node = node.parent) {
+    if (node is! XmlElement) {
+      continue;
+    }
+    if (node.getAttribute('clip-path') != null) {
+      return true;
+    }
+    final String? style = node.getAttribute('style');
+    if (style != null && _clipDeclaration.hasMatch(style)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+final RegExp _clipDeclaration = RegExp(r'(?:^|;)\s*clip-path\s*:', caseSensitive: false);
 
 bool _containsScript(XmlDocument document) =>
     document.descendantElements.any((XmlElement e) => e.name.local == 'script');
