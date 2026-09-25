@@ -53,6 +53,12 @@ Future<AnimatedSvgFrames> precacheAnimatedSvg(
 }) {
   assert(frameRate > 0);
   assert(maxFrames > 0);
+  if (context != null) {
+    // A context means there is a binding to listen with. Precaching is one of
+    // the two ways anything reaches the cache, and an app that precaches and
+    // then waits would otherwise hold everything until its first picture.
+    svgAnimateListenForMemoryPressure();
+  }
   // The same key the widget will look it up under, built by the same class, so
   // that the two cannot drift apart into a precache that silently does nothing.
   final key = AnimatedSvgCacheKey(loader.cacheKey(context), frameRate, maxFrames);

@@ -188,6 +188,32 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 Set `svgAnimateReportDiagnostics` to `false` to keep the printing out of a test
 that loads such a file deliberately.
 
+### Guarding your own SVGs
+
+An SVG that has stopped animating looks exactly like one that has not started,
+so it survives a code review, a glance at the app, and a release. The same check
+this package runs over its own example assets is a dozen lines to copy:
+
+```dart
+test('assets/spinner.svg animates', () async {
+  final AnimatedSvgFrames frames =
+      await compileAnimatedSvg(File('assets/spinner.svg').readAsStringSync());
+
+  expect(frames.diagnostics, isEmpty);
+  expect(frames.isAnimated, isTrue);
+  expect(frames.distinctFrameCount, greaterThan(1));
+});
+```
+
+`distinctFrameCount` is the one to keep: frames that all draw the same picture
+are a still SVG with a ticker, and the count is how you tell.
+
+What this does not catch is a document whose values change and whose drawing
+does not — a `clip-path` over `<text>` is the example, since the clip changes on
+every frame and the letters are drawn in full regardless. The frames differ, so
+a check like the one above is satisfied. Only pixels catch that, which is what
+golden tests are for.
+
 ## How it compares
 
 This package deliberately covers less of SVG than the alternatives, and carries

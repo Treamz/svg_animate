@@ -680,6 +680,14 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
   int _loadGeneration = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Here rather than in the cache's own methods, which are reachable from a
+    // plain Dart test with no binding to add an observer to.
+    svgAnimateListenForMemoryPressure();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _load();
