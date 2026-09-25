@@ -330,6 +330,46 @@ void main() {
     expect(svgAnimateCache.count, 1);
   });
 
+  group('memory pressure', () {
+    /// What the engine sends when the system wants memory back.
+    Future<void> squeeze(WidgetTester tester) {
+      return tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+        SystemChannels.system.name,
+        const JSONMessageCodec().encodeMessage(<String, dynamic>{'type': 'memoryPressure'}),
+        (ByteData? _) {},
+      );
+    }
+
+    testWidgets('lets the cache go', (WidgetTester tester) async {
+      // Flutter throws away every decoded image at this point. Compiled
+      // animations are the larger half of what this package holds, and nothing
+      // was letting go of them.
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+      );
+      await tester.pump();
+      expect(svgAnimateCache.count, 1);
+
+      await squeeze(tester);
+
+      expect(svgAnimateCache.count, 0);
+    });
+
+    testWidgets('and the picture already on screen goes on playing', (WidgetTester tester) async {
+      // Nothing is lost by letting go: a picture holds its own frames, so it
+      // only pays again if it is rebuilt.
+      await tester.pumpWidget(
+        AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+      );
+      await tester.pump();
+
+      await squeeze(tester);
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(_frameIndex(tester), 1);
+    });
+  });
+
   group('a hot reload', () {
     Widget picture(_EditableBundle bundle) => DefaultAssetBundle(
       bundle: bundle,

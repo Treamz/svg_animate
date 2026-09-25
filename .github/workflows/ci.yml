@@ -103,16 +103,52 @@ jobs:
           dart pub global activate pana
           dart pub global run pana --no-warning --exit-code-threshold 20 .
 
+  # Proves the package works from the outside, as a dependency of an app,
+  # rather than only from its own tests — and on every platform it claims,
+  # rather than on the one that is cheapest to build. The example depends on a
+  # plugin with native code for the file picker, which is exactly the sort of
+  # thing that builds on the machine it was added from and nowhere else.
   example:
-    name: Build example
-    runs-on: ubuntu-latest
+    name: Build example for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing is a fact about that platform, and the others are
+      # still worth knowing.
+      fail-fast: false
+      matrix:
+        include:
+          - target: web
+            os: ubuntu-latest
+            packages: ''
+            build: flutter build web --no-tree-shake-icons
+          - target: android
+            os: ubuntu-latest
+            packages: ''
+            build: flutter build apk --debug
+          - target: linux
+            os: ubuntu-latest
+            packages: ninja-build libgtk-3-dev
+            build: flutter build linux --debug
+          - target: macos
+            os: macos-latest
+            packages: ''
+            build: flutter build macos --debug
+          - target: ios
+            os: macos-latest
+            packages: ''
+            build: flutter build ios --debug --no-codesign
+          - target: windows
+            os: windows-latest
+            packages: ''
+            build: flutter build windows --debug
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           cache: true
-      # Proves the package works from the outside, as a dependency of an app,
-      # rather than only from its own tests.
-      - run: flutter build web --no-tree-shake-icons
+      - name: Install what the Linux toolchain needs
+        if: matrix.packages != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.packages }}
+      - run: ${{ matrix.build }}
         working-directory: example

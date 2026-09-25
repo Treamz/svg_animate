@@ -1,3 +1,13 @@
+## Unreleased
+
+* Lets the shared cache go when the system asks for memory back. Flutter throws
+  away every decoded image at that point; compiled animations are the larger
+  half of what this package holds — megabytes rather than kilobytes — and
+  nothing was letting go of them, so an app that had been pushed into the
+  background sat on all of it while the system looked for something to reclaim.
+  A picture that is already on screen holds its own frames and goes on playing;
+  it pays again only if it is rebuilt.
+
 ## 0.5.0
 
 * Names what was animated when an animation draws the same picture every frame,

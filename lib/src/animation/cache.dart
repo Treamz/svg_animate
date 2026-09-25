@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'frames.dart';
 
@@ -227,6 +228,46 @@ class AnimatedSvgCacheKey {
   @override
   String toString() => 'AnimatedSvgCacheKey($loaderKey, ${frameRate}fps, max $maxFrames)';
 }
+
+/// Lets the shared cache go when the system asks for memory back.
+///
+/// Flutter does this for images already: `PaintingBinding.handleMemoryPressure`
+/// throws away every decoded image. Compiled animations are the larger half of
+/// what this package holds — megabytes rather than kilobytes — and nothing was
+/// letting go of them, so an app that had been pushed into the background sat
+/// on all of it while the system looked for something to reclaim.
+///
+/// Everything goes rather than enough to get under some line. A cache holding
+/// ten entries of wildly different sizes has no useful line, and an animation
+/// that is still on screen is not lost by this: the picture holds its own
+/// frames, so it goes on playing and only pays again if it is rebuilt.
+class _MemoryPressureListener with WidgetsBindingObserver {
+  static _MemoryPressureListener? _registered;
+
+  /// Registers once, from somewhere that is known to have a binding.
+  ///
+  /// Not from the cache's own methods: those are called from plain Dart tests
+  /// where touching `WidgetsBinding.instance` would fail, and a cache that
+  /// cannot be used without a binding would be worse than one that occasionally
+  /// holds on a little longer.
+  static void ensureRegistered() {
+    if (_registered != null) {
+      return;
+    }
+    final listener = _MemoryPressureListener();
+    WidgetsBinding.instance.addObserver(listener);
+    _registered = listener;
+  }
+
+  @override
+  void didHaveMemoryPressure() => svgAnimateCache.clear();
+}
+
+/// Starts listening for memory pressure, if nothing has yet.
+///
+/// Called from the picture and from `precacheAnimatedSvg`, which are the two
+/// ways anything gets into the cache in the first place.
+void svgAnimateListenForMemoryPressure() => _MemoryPressureListener.ensureRegistered();
 
 /// The cache of compiled animations shared by every [AnimatedSvgPicture].
 ///
