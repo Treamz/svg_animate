@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.1
 
 * Lets the shared cache go when the system asks for memory back. Flutter throws
   away every decoded image at that point; compiled animations are the larger
