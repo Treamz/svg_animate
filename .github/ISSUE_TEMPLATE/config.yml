@@ -1,0 +1,9 @@
+# Blank issues stay on: a question or an idea should not have to fit a form.
+blank_issues_enabled: true
+contact_links:
+  - name: Try your SVG in the demo
+    url: https://treamz.github.io/svg_animate/
+    about: Open "Try your own" and give it your file. It plays it and reports what compiling it produced, which often answers the question without an issue.
+  - name: When nothing moves
+    url: https://github.com/Treamz/svg_animate#when-nothing-moves
+    about: What each thing the package reports means, and what can be done about it.
