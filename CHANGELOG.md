@@ -18,6 +18,11 @@
   so, which pointed a tracking element to the right for as long as a sample sat
   there. Such segments come from the `Z` of a path whose last curve already
   ended where it started, and from the move between two subpaths.
+* Reads every spelling of `offset-rotate`. The keyword was inferred from a minus
+  sign anywhere in the value, so `auto -30deg` was mistaken for a reversal and
+  turned the element 150 degrees instead of -30. `reverse <angle>` was not
+  recognised at all and lost both the reversal and the heading, arriving as a
+  plain fixed angle.
 
 ## 0.5.1
 

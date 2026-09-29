@@ -129,6 +129,40 @@ void main() {
       );
     });
 
+    for (final (String rotate, String expected) in [
+      ('auto', '0'),
+      ('auto 90deg', '90'),
+      ('auto -30deg', '-30'),
+      ('reverse', '180'),
+      ('reverse 30deg', '210'),
+      ('reverse -30deg', '150'),
+      ('30deg', '30'),
+      ('-30deg', '-30'),
+    ]) {
+      test('reads offset-rotate: $rotate', () {
+        final AnimatedSvgDocument document = AnimatedSvgDocument.parse(
+          svgWith('''
+            <style>
+              #a {
+                offset-path: path('M0 0 L100 0');
+                offset-rotate: $rotate;
+                animation: travel 4s linear infinite;
+              }
+              @keyframes travel {
+                from { offset-distance: 0% }
+                to { offset-distance: 100% }
+              }
+            </style>
+            <rect id="a" width="4" height="4"/>
+          '''),
+        );
+        expect(
+          attributeAt(document, const Duration(seconds: 1), 'a', 'transform'),
+          'translate(25 0) rotate($expected)',
+        );
+      });
+    }
+
     test('wraps around a transform the element already has', () {
       final AnimatedSvgDocument document = AnimatedSvgDocument.parse(
         svgWith('''
