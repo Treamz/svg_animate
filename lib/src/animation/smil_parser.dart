@@ -189,11 +189,14 @@ SvgAttributeAnimation? _parseMotion(
   // rather than move.
   final bool tracksPath = rotate == 'auto' || rotate == 'auto-reverse';
   final values = <AnimatableValue>[];
+  // A fixed rotation never varies and has nothing to be continuous with; only
+  // the headings that follow the path go through this.
+  final heading = ContinuousHeading();
   for (var i = 0; i < _motionPathSamples; i += 1) {
     final MotionPathSample sample = path.sampleAtFraction(i / (_motionPathSamples - 1));
     final double angle = switch (rotate) {
-      'auto' => sample.angleInDegrees,
-      'auto-reverse' => sample.angleInDegrees + 180,
+      'auto' => heading.next(sample.angleInDegrees),
+      'auto-reverse' => heading.next(sample.angleInDegrees + 180),
       _ => fixedRotation ?? 0,
     };
     values.add(

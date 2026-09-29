@@ -60,9 +60,17 @@ class OffsetPath {
 
   /// The transform that places an element at [distance] along the path, where
   /// [distance] is a fraction from 0.0 to 1.0.
-  TransformListValue transformAt(double distance) {
+  ///
+  /// [heading] is given when this is one of a run of keyframes, so that the
+  /// rotation carries on turning across the seam where `atan2` wraps instead of
+  /// spinning the element back the other way. A single placement has nothing to
+  /// be continuous with and passes nothing.
+  TransformListValue transformAt(double distance, {ContinuousHeading? heading}) {
     final MotionPathSample sample = _path.sampleAtFraction(distance);
-    final double angle = _tracksPath ? sample.angleInDegrees + _fixedRotation : _fixedRotation;
+    double angle = _tracksPath ? sample.angleInDegrees + _fixedRotation : _fixedRotation;
+    if (_tracksPath && heading != null) {
+      angle = heading.next(angle);
+    }
     return TransformListValue(<TransformValue>[
       TransformValue('translate', <double>[sample.x, sample.y]),
       // Written even when the angle is zero, so that every keyframe of an
@@ -103,7 +111,8 @@ class OffsetPath {
     final double travelled = spans.fold(0.0, (double sum, double span) => sum + span);
 
     final keyTimes = <double>[animation.keyTimes.first];
-    final values = <AnimatableValue>[transformAt(distances.first)];
+    final heading = ContinuousHeading();
+    final values = <AnimatableValue>[transformAt(distances.first, heading: heading)];
     for (var i = 0; i < spans.length; i += 1) {
       final double share = travelled <= 0 ? 0 : spans[i] / travelled;
       final int steps = math.max(1, (share * _samples).round());
@@ -115,7 +124,9 @@ class OffsetPath {
             ? t
             : animation.keySplines![i].transform(t);
         keyTimes.add(startTime + (endTime - startTime) * t);
-        values.add(transformAt(distances[i] + (distances[i + 1] - distances[i]) * eased));
+        values.add(
+          transformAt(distances[i] + (distances[i + 1] - distances[i]) * eased, heading: heading),
+        );
       }
     }
 

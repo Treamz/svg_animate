@@ -117,6 +117,15 @@ void main() {
     testWidgets('a gradient whose own stops have moved', (WidgetTester tester) async {
       await expectFrame(tester, asset('gradient'), 0.4, 'gradient');
     });
+
+    // Three quarters of the way round, along the bottom, where the arrow is
+    // travelling leftwards and its heading passes through exactly 180 degrees.
+    // `atan2` wraps there, and the arrow used to spin almost the whole way
+    // round in 64 ms, once every loop. The existing orbit golden is at 0.25 and
+    // could never have shown it.
+    testWidgets('an arrow at the seam of its motion path', (WidgetTester tester) async {
+      await expectFrame(tester, asset('orbit'), 0.755, 'orbit_seam', size: const Size(120, 120));
+    });
   });
 
   group('the other shapes the example draws', () {

@@ -6,6 +6,16 @@ import 'package:xml/xml.dart';
 String svgWith(String body) =>
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">$body</svg>';
 
+/// The angle of the `rotate(...)` in the transform of [id] at [time].
+double rotationAt(AnimatedSvgDocument document, Duration time, String id) {
+  final String? transform = attributeAt(document, time, id, 'transform');
+  final RegExpMatch? match = RegExp(r'rotate\(([-0-9.eE]+)').firstMatch(transform ?? '');
+  if (match == null) {
+    fail('No rotation in "$transform" at $time.');
+  }
+  return double.parse(match.group(1)!);
+}
+
 /// The value of [attribute] on the element with the id [id], in the frame of
 /// [document] at [time].
 String? attributeAt(AnimatedSvgDocument document, Duration time, String id, String attribute) {
@@ -278,6 +288,44 @@ void main() {
   });
 
   group('<animateMotion>', () {
+    test('turns the short way where the heading wraps', () {
+      // The example\'s orbit track. Its heading passes through exactly 180
+      // degrees along the bottom, where the arrow is travelling leftwards, and
+      // `atan2` answers in (-180, 180] — so two neighbouring keyframes used to
+      // come out +177.91 and -177.91. Keyframes are interpolated linearly, so
+      // that reads as -355.8 degrees rather than +4.2, and the arrow spun
+      // almost the whole way round in 64 ms, once every loop.
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <polygon id="a" points="-5,-4 6,0 -5,4">
+            <animateMotion path="M8 24 C8 10 40 10 40 24 C40 38 8 38 8 24 Z"
+                dur="3s" rotate="auto" repeatCount="indefinite"/>
+          </polygon>
+        '''),
+      );
+
+      // 2180 ms to 2360 ms is the stretch either side of the seam.
+      final rotations = <double>[
+        for (var ms = 2180; ms <= 2360; ms += 20)
+          rotationAt(document, Duration(milliseconds: ms), 'a'),
+      ];
+
+      for (var i = 1; i < rotations.length; i += 1) {
+        expect(
+          (rotations[i] - rotations[i - 1]).abs(),
+          lessThan(20),
+          reason:
+              'the heading jumped from '
+              '${rotations[i - 1].toStringAsFixed(2)} to ${rotations[i].toStringAsFixed(2)}',
+        );
+      }
+      expect(
+        rotations.last,
+        greaterThan(rotations.first),
+        reason: 'and it is still turning, rather than having been flattened',
+      );
+    });
+
     test('moves the element along its path', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''

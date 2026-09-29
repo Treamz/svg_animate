@@ -1,3 +1,24 @@
+## Unreleased
+
+* Stops an element that follows a motion path from spinning once every loop.
+  A heading comes from `atan2`, which answers in (-180, 180], so it jumps by
+  almost a whole turn the moment the direction of travel crosses 180 degrees —
+  which is whenever the element is moving leftwards. Keyframes are interpolated
+  linearly, so the step either side of that jump read as "turn 356 degrees back
+  the other way" rather than "carry on turning four", and the element spun
+  through most of a revolution in a fraction of a second. Whole turns are now
+  added so that a run of headings stays continuous; the orientation each
+  keyframe describes is unchanged. Affects `rotate="auto"` and
+  `rotate="auto-reverse"` on `<animateMotion>` and `offset-rotate: auto` on a
+  CSS motion path. Any closed path was hit once a loop, since a closed path's
+  heading winds a whole turn and so has to cross the seam somewhere.
+
+* Takes the heading of a motion path from a segment that has one. A segment with
+  no length has no direction, and `atan2(0, 0)` answers zero rather than saying
+  so, which pointed a tracking element to the right for as long as a sample sat
+  there. Such segments come from the `Z` of a path whose last curve already
+  ended where it started, and from the move between two subpaths.
+
 ## 0.5.1
 
 * Lets the shared cache go when the system asks for memory back. Flutter throws
