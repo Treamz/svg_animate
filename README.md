@@ -107,6 +107,47 @@ and that is settled when the animation is compiled.
 `AnimatedBuilder` to follow playback frame by frame, even before loading
 finishes.
 
+### Less motion
+
+Somebody who finds movement uncomfortable turns Reduce Motion on in their system
+settings. An `AnimatedSvgPicture` loads as usual, draws its first frame, and
+starts no ticker.
+
+```dart
+AnimatedSvgPicture.asset(
+  'assets/spinner.svg',
+  respectReduceMotion: false, // it says the app is still working
+);
+```
+
+Turn it off for an animation that carries information rather than decorating: a
+still spinner reads as a frozen app. Reduce Motion is about movement nobody
+asked for, not about everything that moves.
+
+Only starting on its own is given up. A controller told to `play` plays either
+way — that is the app asking on purpose, and the app is the thing that knows
+whether its animation means something.
+
+### In a widget test
+
+A looping animation never settles, so `pumpAndSettle` times out on a screen
+carrying one, and says nothing about which widget kept it awake. Ask for less
+motion and the picture holds its first frame:
+
+```dart
+await tester.pumpWidget(
+  MediaQuery(
+    data: const MediaQueryData(disableAnimations: true),
+    child: yourScreen,
+  ),
+);
+await tester.pumpAndSettle();
+```
+
+To test the animation itself rather than the screen around it, drive it instead:
+pass an `AnimatedSvgController`, `autoPlay: false`, and `seek` to the frame you
+want.
+
 ## Supported SVG features
 
 ### Animation
