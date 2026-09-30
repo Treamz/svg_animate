@@ -366,6 +366,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -400,6 +401,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -440,6 +442,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -479,6 +482,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -509,6 +513,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -539,6 +544,7 @@ class AnimatedSvgPicture extends StatefulWidget {
     this.renderingStrategy = RenderingStrategy.picture,
     this.controller,
     this.autoPlay = true,
+    this.respectReduceMotion = true,
     this.repeat,
     this.onCompleted,
     this.frameRate = defaultAnimationFrameRate,
@@ -612,6 +618,25 @@ class AnimatedSvgPicture extends StatefulWidget {
 
   /// Whether the animation starts playing as soon as it has loaded.
   final bool autoPlay;
+
+  /// Whether to hold still when the platform asks for less motion.
+  ///
+  /// Someone who finds movement uncomfortable or disabling turns Reduce Motion
+  /// on in their system settings, which reaches Flutter as
+  /// `MediaQuery.disableAnimationsOf`. With this true, which is the default,
+  /// such an animation loads and draws its first frame and no ticker is
+  /// started.
+  ///
+  /// Set it to false for an animation that is carrying information rather than
+  /// decorating — a spinner that says the app is still working is the usual
+  /// one, since a still spinner reads as a frozen app. Reduce Motion is about
+  /// movement nobody asked for, not about every moving thing.
+  ///
+  /// This decides only whether playback *starts on its own*. An
+  /// [AnimatedSvgController] that is told to [AnimatedSvgController.play] plays
+  /// either way: that is the app asking on purpose, and the app is the one that
+  /// can tell whether its animation means something.
+  final bool respectReduceMotion;
 
   /// Whether the animation restarts when it reaches the end.
   ///
@@ -687,10 +712,29 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
     svgAnimateListenForMemoryPressure();
   }
 
+  /// Whether the platform has asked for less motion and this picture is
+  /// listening.
+  ///
+  /// Read here rather than where playback starts because it comes from an
+  /// inherited widget: reading it in `build` or later would not subscribe this
+  /// element to changes, and somebody turning Reduce Motion on while the app is
+  /// open would go on watching it move.
+  bool _holdStill = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final bool holdStill = widget.respectReduceMotion && MediaQuery.disableAnimationsOf(context);
+    final bool changed = holdStill != _holdStill;
+    _holdStill = holdStill;
     _load();
+    // Turned on part way through is the case that needs saying out loud: the
+    // frames are already compiled, so `_load` finds them in the cache and
+    // returns without starting anything, and the ticker from before is still
+    // running.
+    if (changed && holdStill) {
+      _playback?.stop();
+    }
   }
 
   @override
@@ -714,6 +758,12 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
         } else {
           playback.forward();
         }
+      }
+    }
+    if (oldWidget.respectReduceMotion != widget.respectReduceMotion) {
+      _holdStill = widget.respectReduceMotion && MediaQuery.disableAnimationsOf(context);
+      if (_holdStill) {
+        _playback?.stop();
       }
     }
     if (oldWidget.bytesLoader != widget.bytesLoader ||
@@ -899,10 +949,14 @@ class _AnimatedSvgPictureState extends State<AnimatedSvgPicture> with TickerProv
       ..addListener(_handleTick)
       ..addStatusListener(_handleStatus);
     _playback = playback;
+    // Playback is still built when the platform has asked for less motion, so
+    // that the animation can be seeked and so that a controller told to play
+    // still plays. Only starting on its own is given up.
+    final bool autoPlay = widget.autoPlay && !_holdStill;
     final AnimatedSvgController? controller = widget.controller;
     if (controller != null) {
-      controller._attach(playback, repeat: _repeats(frames), autoPlay: widget.autoPlay);
-    } else if (widget.autoPlay) {
+      controller._attach(playback, repeat: _repeats(frames), autoPlay: autoPlay);
+    } else if (autoPlay) {
       if (_repeats(frames)) {
         playback.repeat();
       } else {

@@ -121,6 +121,13 @@ jobs:
             os: ubuntu-latest
             packages: ''
             build: flutter build web --no-tree-shake-icons
+          # pub.dev shows this package as WebAssembly ready, which it works out
+          # by reading the source rather than by compiling it. This is the part
+          # that compiles it.
+          - target: web (wasm)
+            os: ubuntu-latest
+            packages: ''
+            build: flutter build web --wasm --no-tree-shake-icons
           - target: android
             os: ubuntu-latest
             packages: ''

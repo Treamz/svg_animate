@@ -1,5 +1,19 @@
 ## Unreleased
 
+* Holds still when the platform asks for less motion. Somebody who finds
+  movement uncomfortable turns Reduce Motion on in their system settings, which
+  reaches Flutter as `MediaQuery.disableAnimationsOf`, and nothing in this
+  package read it: the animation played anyway. A picture now loads as usual,
+  draws its first frame and starts no ticker. Pass `respectReduceMotion: false`
+  for an animation that carries information rather than decorating, since a
+  still spinner reads as a frozen app. Only starting on its own is given up; a
+  controller told to play plays either way.
+
+  This also gives a widget test a way to settle. A looping animation never
+  does, so `pumpAndSettle` on a screen carrying one times out and says nothing
+  about which widget kept it awake; wrapping it in a `MediaQuery` that asks for
+  less motion holds the first frame. The README has both.
+
 * Stops an element that follows a motion path from spinning once every loop.
   A heading comes from `atan2`, which answers in (-180, 180], so it jumps by
   almost a whole turn the moment the direction of travel crosses 180 degrees —

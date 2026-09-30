@@ -330,6 +330,113 @@ void main() {
     expect(svgAnimateCache.count, 1);
   });
 
+  group('when the platform asks for less motion', () {
+    Widget quiet({required Widget child, bool disableAnimations = true}) => MediaQuery(
+      data: MediaQueryData(disableAnimations: disableAnimations),
+      child: Directionality(textDirection: TextDirection.ltr, child: child),
+    );
+
+    testWidgets('holds its first frame instead of playing', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        quiet(child: AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 750));
+
+      expect(_frameIndex(tester), 0);
+    });
+
+    testWidgets('and a test with one on screen settles', (WidgetTester tester) async {
+      // The practical half. A looping animation never settles, so a widget test
+      // of a screen carrying one times out in `pumpAndSettle` with nothing in
+      // the failure to suggest the SVG is what did it.
+      await tester.pumpWidget(
+        quiet(child: AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100)),
+      );
+
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('but plays as usual when it is not asked for', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        quiet(
+          disableAnimations: false,
+          child: AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(_frameIndex(tester), 1);
+    });
+
+    testWidgets('and plays anyway when the picture says it carries meaning', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        quiet(
+          child: AnimatedSvgPicture.string(
+            _spinner,
+            frameRate: 4,
+            width: 100,
+            height: 100,
+            respectReduceMotion: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(_frameIndex(tester), 1);
+    });
+
+    testWidgets('a controller told to play still plays', (WidgetTester tester) async {
+      // Asking on purpose beats a default. The app is the only thing that knows
+      // whether its animation is decoration or information.
+      final controller = AnimatedSvgController();
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        quiet(
+          child: AnimatedSvgPicture.string(
+            _spinner,
+            frameRate: 4,
+            width: 100,
+            height: 100,
+            controller: controller,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(controller.isPlaying, isFalse);
+
+      controller.play();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(_frameIndex(tester), 1);
+    });
+
+    testWidgets('turning it on part way through stops what is running', (
+      WidgetTester tester,
+    ) async {
+      Widget at(bool disableAnimations) => quiet(
+        disableAnimations: disableAnimations,
+        child: AnimatedSvgPicture.string(_spinner, frameRate: 4, width: 100, height: 100),
+      );
+
+      await tester.pumpWidget(at(false));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(_frameIndex(tester), 1);
+
+      await tester.pumpWidget(at(true));
+      await tester.pump(const Duration(milliseconds: 750));
+
+      expect(_frameIndex(tester), 1, reason: 'it stopped where it was rather than carrying on');
+    });
+  });
+
   group('memory pressure', () {
     /// What the engine sends when the system wants memory back.
     Future<void> squeeze(WidgetTester tester) {
