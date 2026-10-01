@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.0
 
 * Holds still when the platform asks for less motion. Somebody who finds
   movement uncomfortable turns Reduce Motion on in their system settings, which
