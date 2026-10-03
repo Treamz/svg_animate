@@ -1,3 +1,16 @@
+## Unreleased
+
+* Says which version to depend on. Getting started still read
+  `svg_animate: ^0.3.2`, and below 1.0.0 a caret constraint pins the minor, so
+  anyone who copied that line resolved to 0.3.8 and nothing since. Nothing in
+  the code changed for this; the README and the description on pub.dev come from
+  whatever version is published, which is why it needs one.
+
+* Opens the package description with "Animated SVG", which is the phrase people
+  search for and which it did not contain. Searching pub.dev for `animated svg`
+  put this package ninth, while `smil` put it second — a word only somebody who
+  already knows the format would type.
+
 ## 0.6.0
 
 * Holds still when the platform asks for less motion. Somebody who finds
