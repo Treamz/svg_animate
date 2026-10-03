@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.1
 
 * Says which version to depend on. Getting started still read
   `svg_animate: ^0.3.2`, and below 1.0.0 a caret constraint pins the minor, so
