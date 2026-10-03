@@ -46,7 +46,7 @@ for the parts of such files that do not survive.
 
 ```yaml
 dependencies:
-  svg_animate: ^0.3.2
+  svg_animate: ^0.6.0
 ```
 
 There are constructors for every source `flutter_svg` supports:
