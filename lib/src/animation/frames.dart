@@ -271,8 +271,7 @@ int _sharedPrefixLength(List<Uint8List> frames) {
 SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
   final buffer = StringBuffer(
     'This SVG declares an animation, and every frame it was sampled at drew exactly '
-    'the same picture: the values change and nothing about the drawing does. It is '
-    'treated as a still picture and no ticker is started.',
+    'the same picture. It is treated as a still picture and no ticker is started.',
   );
   if (animated.isNotEmpty) {
     final List<String> names = animated.toList()..sort();
@@ -290,6 +289,17 @@ SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
     buffer.write(
       ' Path data is not a value this package interpolates, so an animated "d" never '
       'reaches the frames at all: the element keeps the "d" it was authored with.',
+    );
+  }
+  if (!animated.contains('stroke-dashoffset') && !animated.contains('d')) {
+    // Only when neither of the two known causes applies. Where one does, it is
+    // named exactly, and offering a list of maybes after that would be worse
+    // than saying nothing.
+    buffer.write(
+      ' Either the values reach the frames and the renderer draws the same thing '
+      'from them, or they never reach the frames at all — an animation told to '
+      'begin after it ends never runs, and one given a single value has nothing '
+      'to travel towards.',
     );
   }
   return SvgAnimateDiagnostic(SvgAnimateDiagnosticKind.neverChanges, buffer.toString());

@@ -1,3 +1,27 @@
+## Unreleased
+
+* Lets go of a compile that was evicted while it was still running. `clear` and
+  `evict` emptied the cache and left a compile already under way alone, so it
+  finished, stored itself, and was handed out as current. Two things stood on
+  that: a hot reload evicts and loads again so an edited SVG shows, and the
+  cache clears itself when the system asks for memory back. Reloading while the
+  first compile was still going brought back the animation from before the edit,
+  and memory given back under pressure was handed straight back.
+
+* Reports what the server actually answered. The network loader returned the
+  response body whatever the status, so a 404 whose body is an HTML page
+  surfaced as `Bad state: Invalid SVG data` and a 500 as an XML parser error —
+  the file was never reached, and the developer was sent to look at the file.
+  Anything outside 2xx now throws a `ClientException` naming the status and the
+  address.
+
+* Stops `neverChanges` claiming that the values changed. They do not always: an
+  animation given a single value, or told to begin after it ends, never writes
+  anything, and the message still opened by saying the values moved and only the
+  drawing did not. Where the cause is one of the two known ones it is still
+  named exactly; where it is not, both possibilities are offered instead of the
+  wrong one.
+
 ## 0.6.1
 
 * Says which version to depend on. Getting started still read
