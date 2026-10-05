@@ -92,9 +92,15 @@ class AnimationCache {
   int _currentSizeBytes = 0;
 
   /// Evicts all entries from the cache.
+  ///
+  /// A compile that is already running cannot be stopped, but it stops counting
+  /// as this cache's: it is no longer handed to anything that asks for the same
+  /// key, and its result is dropped rather than stored. Otherwise clearing to
+  /// free memory would hand that memory straight back a moment later.
   void clear() {
     _cache.clear();
     _sizes.clear();
+    _pending.clear();
     _currentSizeBytes = 0;
   }
 
@@ -111,9 +117,15 @@ class AnimationCache {
     return cached;
   }
 
-  /// Evicts a single entry from the cache, returning true if successful.
+  /// Evicts a single entry from the cache, returning true if there was one.
+  ///
+  /// Counts a compile that is still running as an entry, and disowns it the
+  /// same way [clear] does. Anything evicting in order to compile again — a hot
+  /// reload after the file on disk changed, say — would otherwise be handed the
+  /// result of the compile it was trying to get rid of.
   bool evict(Object key) {
-    return _remove(key);
+    final bool wasPending = _pending.remove(key) != null;
+    return _remove(key) || wasPending;
   }
 
   /// The number of entries in the cache.
@@ -143,15 +155,33 @@ class AnimationCache {
     _pending[key] = result;
     return result.then(
       (AnimatedSvgFrames frames) {
-        _pending.remove(key);
-        _add(key, frames);
+        // Only stored if this is still the compile the cache is waiting for.
+        // `clear` and `evict` drop the pending entry, and a later `putIfAbsent`
+        // replaces it, so finishing is not on its own a reason to be kept: the
+        // source it was compiled from may have been thrown away meanwhile.
+        if (_disown(key, result)) {
+          _add(key, frames);
+        }
         return frames;
       },
       onError: (Object error, StackTrace stackTrace) {
-        _pending.remove(key);
+        _disown(key, result);
         throw Error.throwWithStackTrace(error, stackTrace);
       },
     );
+  }
+
+  /// Removes [key] from the pending set if [result] is still what is pending
+  /// there, and says whether it was.
+  ///
+  /// Checked by identity rather than removed outright, so that a compile which
+  /// has already been disowned cannot remove the one that replaced it.
+  bool _disown(Object key, Future<AnimatedSvgFrames> result) {
+    if (!identical(_pending[key], result)) {
+      return false;
+    }
+    _pending.remove(key);
+    return true;
   }
 
   void _add(Object key, AnimatedSvgFrames frames) {
