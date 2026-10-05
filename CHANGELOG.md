@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.2
 
 * Lets go of a compile that was evicted while it was still running. `clear` and
   `evict` emptied the cache and left a compile already under way alone, so it
