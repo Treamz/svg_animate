@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -127,6 +128,94 @@ void main() {
 
       expect(cache.count, 1);
       expect(cache.currentSizeBytes, 700);
+    });
+  });
+
+  group('a compile that is still running', () {
+    /// Starts a compile and holds it open, so that a cache operation can happen
+    /// in the middle of one. That window is the only place these behaviours
+    /// exist, and it is the window a hot reload lands in.
+    (Future<AnimatedSvgFrames>, Completer<void>) held(
+      AnimationCache cache,
+      Object key,
+      AnimatedSvgFrames result,
+    ) {
+      final gate = Completer<void>();
+      return (
+        cache.putIfAbsent(key, () async {
+          await gate.future;
+          return result;
+        }),
+        gate,
+      );
+    }
+
+    test('is disowned by evict, so the next ask compiles again', () async {
+      // Without this a hot reload evicts, reloads, and is handed back the
+      // animation compiled from the file as it was before the edit.
+      final cache = AnimationCache();
+      final AnimatedSvgFrames before = sized(16);
+      final AnimatedSvgFrames after = sized(32);
+
+      final (Future<AnimatedSvgFrames> running, Completer<void> gate) = held(cache, 'k', before);
+      expect(cache.evict('k'), isTrue, reason: 'there was something to evict');
+
+      gate.complete();
+      await running;
+      expect(cache.count, 0, reason: 'the disowned compile was not stored');
+
+      final AnimatedSvgFrames next = await cache.putIfAbsent('k', () async => after);
+      expect(identical(next, after), isTrue, reason: 'and the next ask compiled again');
+    });
+
+    test('is disowned by clear, so memory given back stays given back', () async {
+      final cache = AnimationCache();
+      final (Future<AnimatedSvgFrames> running, Completer<void> gate) = held(cache, 'k', sized(64));
+
+      cache.clear();
+      gate.complete();
+      await running;
+
+      expect(cache.count, 0);
+      expect(cache.currentSizeBytes, 0);
+    });
+
+    test('still gives its result to whoever was already waiting', () async {
+      // Disowning decides what the cache keeps. It does not fail the caller who
+      // asked before it happened.
+      final cache = AnimationCache();
+      final AnimatedSvgFrames frames = sized(16);
+      final (Future<AnimatedSvgFrames> running, Completer<void> gate) = held(cache, 'k', frames);
+
+      cache.clear();
+      gate.complete();
+
+      expect(identical(await running, frames), isTrue);
+    });
+
+    test('and does not evict the compile that replaced it', () async {
+      // The reason the pending entry is checked by identity rather than just
+      // removed: a disowned compile finishing later must not take the live one
+      // with it.
+      final cache = AnimationCache();
+      final AnimatedSvgFrames first = sized(16);
+      final AnimatedSvgFrames second = sized(32);
+
+      final (Future<AnimatedSvgFrames> running, Completer<void> gate) = held(cache, 'k', first);
+      cache.evict('k');
+      final (Future<AnimatedSvgFrames> replacement, Completer<void> other) = held(
+        cache,
+        'k',
+        second,
+      );
+
+      gate.complete();
+      await running;
+      other.complete();
+
+      expect(identical(await replacement, second), isTrue);
+      expect(cache.count, 1, reason: 'the replacement was kept');
+      expect(cache.currentSizeBytes, 32);
     });
   });
 }

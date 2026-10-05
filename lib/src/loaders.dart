@@ -283,6 +283,17 @@ class SvgAnimateNetworkLoader extends SvgSourceLoader<Uint8List> {
     final http.Client client = _httpClient ?? http.Client();
     try {
       final http.Response response = await client.get(Uri.parse(url), headers: headers);
+      // Checked rather than parsed hopefully. An error page is bytes like any
+      // other, and handing it on means the SVG parser fails on somebody else's
+      // HTML — which reads as "your file is broken" when the file was never
+      // reached. A wrong address, an expired link and a login page in the way
+      // all land here.
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw http.ClientException(
+          'The server answered ${response.statusCode} rather than sending an SVG.',
+          response.request?.url ?? Uri.parse(url),
+        );
+      }
       return response.bodyBytes;
     } finally {
       if (_httpClient == null) {

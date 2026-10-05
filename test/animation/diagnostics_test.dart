@@ -238,6 +238,59 @@ void main() {
       expect(found.last.message, contains('"d"'));
     });
 
+    test('does not claim the values changed when they never did', () async {
+      // `values="42"` has one value, so nothing was ever going to move. The
+      // message used to open by asserting that the values changed and only the
+      // drawing did not, which sends the reader after a renderer limitation
+      // that is not there.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="10" height="10" fill="#f00">
+    <animate attributeName="x" dur="1s" values="42" repeatCount="indefinite"/>
+  </rect>
+</svg>''');
+
+      final SvgAnimateDiagnostic still = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      );
+      expect(still.message, isNot(contains('the values change')));
+      expect(still.message, contains('single value'));
+    });
+
+    test('and offers the other cause for an animation that never runs', () async {
+      // Told to begin after it ends, so no value is ever written. The same
+      // sentence has to cover it, since the frames look identical either way.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="10" height="10" fill="#f00">
+    <animate attributeName="x" dur="1s" begin="5s" end="1s" values="0;90"/>
+  </rect>
+</svg>''');
+
+      final SvgAnimateDiagnostic still = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      );
+      expect(still.message, contains('begin after it ends'));
+    });
+
+    test('but says nothing vague when it knows the exact cause', () async {
+      // Where a known culprit is named, a list of maybes after it would be
+      // worse than silence.
+      final List<SvgAnimateDiagnostic> found = await diagnose('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20">
+  <path d="M5 10 L95 10" stroke="#f00" stroke-dasharray="90" stroke-dashoffset="90">
+    <animate attributeName="stroke-dashoffset" from="90" to="0" dur="1s"
+             repeatCount="indefinite"/>
+  </path>
+</svg>''');
+
+      final SvgAnimateDiagnostic still = found.firstWhere(
+        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      );
+      expect(still.message, contains('"stroke-dasharray"'));
+      expect(still.message, isNot(contains('single value')));
+    });
+
     test('names an animated stroke-dashoffset, and the way round it', () async {
       // The one worth naming. Drawing a path on is normally written this way,
       // the values are written into every frame correctly, and the renderer
