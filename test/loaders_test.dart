@@ -93,6 +93,44 @@ void main() {
       expect(source.xml, markup);
     });
 
+    test('a response that is not a success is reported as one', () async {
+      // Otherwise the error page is handed to the SVG parser and the developer
+      // is told their file is malformed, when the file was never reached.
+      final MockClient client = MockClient(
+        (http.Request request) async =>
+            http.Response('<!DOCTYPE html><html><body>Not Found</body></html>', 404),
+      );
+
+      await expectLater(
+        SvgAnimateNetworkLoader(
+          'https://example.com/a.svg',
+          httpClient: client,
+        ).loadSvgSource(null),
+        throwsA(
+          isA<http.ClientException>().having(
+            (http.ClientException e) => e.message,
+            'message',
+            contains('404'),
+          ),
+        ),
+      );
+    });
+
+    test('and a redirect that the client followed is still a success', () async {
+      // 2xx rather than exactly 200: the client follows redirects itself, and
+      // 204 or 206 are not errors to refuse on this loader's behalf.
+      final MockClient client = MockClient(
+        (http.Request request) async => http.Response(markup, 203),
+      );
+
+      final SvgSource source = await SvgAnimateNetworkLoader(
+        'https://example.com/a.svg',
+        httpClient: client,
+      ).loadSvgSource(null);
+
+      expect(source.xml, markup);
+    });
+
     test('a network response is decoded, and the headers are sent', () async {
       late Map<String, String> sent;
       final MockClient client = MockClient((http.Request request) async {
