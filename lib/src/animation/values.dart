@@ -43,6 +43,46 @@ String formatSvgNumber(double value) {
   return text.substring(0, end);
 }
 
+/// The angle [value] describes, in degrees, or null when it is not an angle.
+///
+/// CSS writes an angle with one of four units, while an SVG attribute writes a
+/// bare number of degrees. Both reach here, so a number without a unit is read
+/// as degrees.
+double? parseAngleInDegrees(String value) => _parseScalar(value, lengthsAllowed: false);
+
+/// The number [value] describes, with angles converted to degrees.
+///
+/// [lengthsAllowed] admits `px`, the one length unit that resolves without
+/// knowing anything about the element it was written on. Percentages and
+/// physical units need that context, so they are never accepted.
+double? _parseScalar(String value, {required bool lengthsAllowed}) {
+  final RegExpMatch? match = _numberPattern.firstMatch(value.trim());
+  if (match == null) {
+    return null;
+  }
+  final double? number = double.tryParse(match.group(1)!);
+  if (number == null) {
+    return null;
+  }
+  // Units are case-insensitive in CSS, and in the SVG attributes that borrow
+  // their syntax.
+  switch (match.group(2)!.toLowerCase()) {
+    case '':
+    case 'deg':
+      return number;
+    case 'px':
+      return lengthsAllowed ? number : null;
+    case 'rad':
+      return number * 180 / math.pi;
+    case 'grad':
+      return number * 0.9;
+    case 'turn':
+      return number * 360;
+    default:
+      return null;
+  }
+}
+
 /// A parsed SVG attribute value that an animation can interpolate.
 ///
 /// Values are immutable so that they can be shared between the frames of an
@@ -594,7 +634,7 @@ class TransformListValue extends AnimatableValue {
       if (argument.isEmpty) {
         continue;
       }
-      final double? parsed = _parseTransformArgument(name, argument);
+      final double? parsed = _parseScalar(argument, lengthsAllowed: true);
       if (parsed == null) {
         return null;
       }
@@ -635,33 +675,6 @@ class TransformListValue extends AnimatableValue {
           if (arguments.length > 1) TransformValue('skewY', <double>[arguments[1]]),
         ];
       default:
-        return null;
-    }
-  }
-
-  static double? _parseTransformArgument(String name, String argument) {
-    final RegExpMatch? match = _numberPattern.firstMatch(argument);
-    if (match == null) {
-      return null;
-    }
-    final double? number = double.tryParse(match.group(1)!);
-    if (number == null) {
-      return null;
-    }
-    switch (match.group(2)!) {
-      case '':
-      case 'px':
-      case 'deg':
-        return number;
-      case 'rad':
-        return number * 180 / math.pi;
-      case 'grad':
-        return number * 0.9;
-      case 'turn':
-        return number * 360;
-      default:
-        // Percentages and physical length units depend on context that is not
-        // available here.
         return null;
     }
   }

@@ -4,6 +4,8 @@ import 'animation.dart';
 import 'motion_path.dart';
 import 'values.dart';
 
+final RegExp _whitespace = RegExp(r'\s+');
+
 final RegExp _pathFunction = RegExp(r'''^path\(\s*(?:'([^']*)'|"([^"]*)"|([^)]*))\s*\)$''');
 
 /// The CSS motion path declared on an element by `offset-path`.
@@ -41,14 +43,25 @@ class OffsetPath {
       return null;
     }
 
-    final String rotate = declarations['offset-rotate']?.trim() ?? 'auto';
-    final bool isAuto = rotate == 'auto' || rotate.startsWith('auto ');
-    final bool reversed = rotate == 'reverse' || rotate.startsWith('reverse ');
-    final bool tracksPath = isAuto || reversed;
-    final NumberListValue? angle = NumberListValue.parse(
-      rotate.replaceFirst('auto', '').replaceFirst('reverse', '').trim(),
-    );
-    return OffsetPath._(path, tracksPath, (angle?.numbers.first ?? 0) + (reversed ? 180 : 0));
+    // `offset-rotate: [ auto | reverse ] || <angle>`, which admits the two parts
+    // in either order. The keywords are case-insensitive, as CSS keywords are,
+    // and the angle carries one of the four CSS angle units.
+    final String rotate = declarations['offset-rotate']?.trim().toLowerCase() ?? 'auto';
+    bool tracksPath = false;
+    bool reversed = false;
+    double? angle;
+    for (final String token in rotate.split(_whitespace)) {
+      switch (token) {
+        case 'auto':
+          tracksPath = true;
+        case 'reverse':
+          tracksPath = true;
+          reversed = true;
+        default:
+          angle ??= parseAngleInDegrees(token);
+      }
+    }
+    return OffsetPath._(path, tracksPath, (angle ?? 0) + (reversed ? 180 : 0));
   }
 
   final MotionPath _path;

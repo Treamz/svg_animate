@@ -138,6 +138,15 @@ void main() {
       ('reverse -30deg', '150'),
       ('30deg', '30'),
       ('-30deg', '-30'),
+      // CSS keywords and units are case-insensitive, and an angle can be
+      // written in any of the four CSS units rather than only in degrees.
+      ('AUTO', '0'),
+      ('Reverse', '180'),
+      ('reverse 30DEG', '210'),
+      ('0.5turn', '180'),
+      ('auto 0.25turn', '90'),
+      ('-0.25TURN', '-90'),
+      ('100grad', '90'),
     ]) {
       test('reads offset-rotate: $rotate', () {
         final AnimatedSvgDocument document = AnimatedSvgDocument.parse(
@@ -162,6 +171,54 @@ void main() {
         );
       });
     }
+
+    test('reads the angle and the keyword in either order', () {
+      // `[ auto | reverse ] || <angle>` admits both orders. The path heads
+      // downwards so that the heading is 90 degrees and tracking it is visible
+      // in the result, which it would not be along a horizontal path.
+      final AnimatedSvgDocument document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a {
+              offset-path: path('M0 0 L0 100');
+              offset-rotate: 30deg auto;
+              animation: travel 4s linear infinite;
+            }
+            @keyframes travel {
+              from { offset-distance: 0% }
+              to { offset-distance: 100% }
+            }
+          </style>
+          <rect id="a" width="4" height="4"/>
+        '''),
+      );
+      expect(
+        attributeAt(document, const Duration(seconds: 1), 'a', 'transform'),
+        'translate(0 25) rotate(120)',
+      );
+    });
+
+    test('reads an angle in radians', () {
+      // Radians do not land on a whole number of degrees, so this one is kept
+      // out of the table above, which compares the formatted attribute.
+      final AnimatedSvgDocument document = AnimatedSvgDocument.parse(
+        svgWith('''
+          <style>
+            #a {
+              offset-path: path('M0 0 L100 0');
+              offset-rotate: 1.5708rad;
+              animation: travel 4s linear infinite;
+            }
+            @keyframes travel {
+              from { offset-distance: 0% }
+              to { offset-distance: 100% }
+            }
+          </style>
+          <rect id="a" width="4" height="4"/>
+        '''),
+      );
+      expect(rotationAt(document, const Duration(seconds: 1), 'a'), closeTo(90, 0.001));
+    });
 
     test('wraps around a transform the element already has', () {
       final AnimatedSvgDocument document = AnimatedSvgDocument.parse(

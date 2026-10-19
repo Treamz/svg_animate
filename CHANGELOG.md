@@ -1,3 +1,14 @@
+## Unreleased
+
+* Reads `offset-rotate` the way CSS defines it. Its keywords were compared
+  letter for letter and the angle's unit was thrown away, so `AUTO` was not
+  recognised as a keyword at all — the element quietly stopped following its
+  path — and `0.5turn` turned it by half a degree instead of half a turn.
+  Keywords are now matched without regard to case, `rad`, `grad` and `turn` are
+  converted to degrees, and the angle may be written before the keyword as well
+  as after it, which the grammar has always allowed. Angle units are
+  case-insensitive in `transform` for the same reason.
+
 ## 0.6.2
 
 * Lets go of a compile that was evicted while it was still running. `clear` and
