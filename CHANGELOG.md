@@ -1,4 +1,4 @@
-## Unreleased
+## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
   letter for letter and the angle's unit was thrown away, so `AUTO` was not
