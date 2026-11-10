@@ -282,6 +282,10 @@ Which to reach for:
 What is written above about other packages comes from their descriptions and
 dependency lists, not from benchmarking them.
 
+For a longer walk-through, including `animated_svg` and `drawing_animation`,
+see
+[how svg_animate plays animated SVGs in Flutter, and how it compares with Lottie and other packages](https://treamz.me/blog/flutter-svg-animation).
+
 ## How it works, and what it costs
 
 When the picture loads, the animations the document declares are resolved, and
