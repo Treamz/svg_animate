@@ -191,7 +191,7 @@ renderer cannot do them on its own:
 
 | | why |
 |---|---|
-| `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect. Where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it |
+| `<filter>` beyond blur, offset and merge | `vector_graphics_compiler` 1.3.6 and later, which need Flutter 3.41, draw `feGaussianBlur`, `feOffset` and `feMerge` — so a soft shadow or a plain glow is drawn, and its `stdDeviation`, `dx` and `dy` animate — and leave out the whole of a filter that uses any other primitive, such as the `feFlood` and `feColorMatrix` in the drop shadows design tools export. On an earlier Flutter no filter is drawn; where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it. Either way the element still draws, without the effect |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
 | Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
 | `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
@@ -221,7 +221,7 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
 | `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and for the two known cases says which layer dropped them: an animated `d` never reaches the frames, while a `stroke-dashoffset` reaches them and is dropped by the renderer |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
-| `droppedFilter` | a `<filter>` is used, and filters are not drawn. If the whole of it is one `feGaussianBlur`, the message carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
+| `droppedFilter` | a `<filter>` is used that the renderer leaves out. Which filters those are depends on the version of `vector_graphics` the app resolves, so the compiler in use is asked rather than a list consulted: a filter it draws is not reported. The message names the primitives it does not draw. On a Flutter older than 3.41 it also says what upgrading would draw, and if the whole of a filter is one `feGaussianBlur`, it carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
 | `unclippedText` | a `clip-path` applies over `<text>`, which it will not reach; the letters draw in full from the first frame to the last |
 | `expensive` | the compiled animation came to more than 4 MB. The message says how large, over how many frames, how many of those are different pictures, and which of `frameRate` and `maxFrames` changes it |
@@ -274,7 +274,7 @@ Which to reach for:
 | | |
 |---|---|
 | **svg_animate** | Spinners, loaders, animated icons, exports from animation editors. You already use `flutter_svg` and want to keep the dependency list short. |
-| [**full_svg_flutter**](https://pub.dev/packages/full_svg_flutter) | You need filters, `d` morphing, or SVGs that carry `<script>`. It covers considerably more of the format, and bundles a QuickJS runtime and `woff2` to do it. |
+| [**full_svg_flutter**](https://pub.dev/packages/full_svg_flutter) | You need filters beyond blur, offset and merge, `d` morphing, or SVGs that carry `<script>`. It covers considerably more of the format, and bundles a QuickJS runtime and `woff2` to do it. |
 | [**anim_svg**](https://pub.dev/packages/anim_svg) | You would rather transpile to Lottie and render through the native thorvg engine. |
 | [**flutter_svg**](https://pub.dev/packages/flutter_svg) | The SVG does not animate. |
 | [**lottie**](https://pub.dev/packages/lottie), [**rive**](https://pub.dev/packages/rive) | The animation is authored in those formats to begin with. Both are far more capable than any SVG animation runtime, if you can choose the format. |
