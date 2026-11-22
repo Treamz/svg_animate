@@ -419,7 +419,7 @@ List<AnimatableValue>? _parseValues(
   if (from != null) {
     start = parse(from);
   } else {
-    final String? base = baseValueOf(target, attributeName);
+    final String? base = baseValueOf(target, attributeName) ?? _initialValues[attributeName];
     start = base == null ? null : parse(base);
   }
   if (start == null) {
@@ -497,3 +497,33 @@ AnimatableValue? parseAnimationValue(String attributeName, String raw, {String? 
   }
   return parseAnimatableValue(attributeName, raw);
 }
+
+/// What an attribute is when nothing sets it, for the attributes that do not
+/// inherit.
+///
+/// A `to` animation starts from the value underneath it, and with no attribute
+/// on the element that is this value, not nothing. Icon sets grow a circle in
+/// with `<animate attributeName="r" to="4"/>` on a `<circle>` that has no `r`;
+/// finding nothing to start from, the animation was dropped and the circle never
+/// appeared. Chrome starts these from the values here.
+///
+/// Inherited properties are not listed: they start from whatever the nearest
+/// ancestor sets, which `baseValueOf` already looks up.
+const Map<String, String> _initialValues = <String, String>{
+  'x': '0',
+  'y': '0',
+  'cx': '0',
+  'cy': '0',
+  'r': '0',
+  'rx': '0',
+  'ry': '0',
+  'x1': '0',
+  'y1': '0',
+  'x2': '0',
+  'y2': '0',
+  'width': '0',
+  'height': '0',
+  'opacity': '1',
+  'stop-opacity': '1',
+  'flood-opacity': '1',
+};
