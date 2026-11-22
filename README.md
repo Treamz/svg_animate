@@ -159,7 +159,7 @@ want.
 | `<animateMotion>` | `path` and `<mpath>`, `rotate="auto"` / `auto-reverse` |
 | `<set>` | yes |
 | `calcMode` | `linear`, `discrete`, `paced`, `spline` |
-| Timing | `begin` (offsets), `dur`, `end`, `repeatCount`, `repeatDur`, `fill` |
+| Timing | `begin` (offsets, lists of them, and the `begin` or `end` of another animation plus an offset), `dur`, `end`, `repeatCount`, `repeatDur`, `fill`, `restart` |
 | Composition | `additive="sum"`, `accumulate="sum"` |
 | Targeting | `href` / `xlink:href`, or the parent element |
 | CSS `@keyframes` | `animation` shorthand and every longhand, per-keyframe `animation-timing-function` |
@@ -167,7 +167,16 @@ want.
 | `animation-fill-mode` | `forwards` and `both` hold the last frame |
 | CSS motion paths | `offset-path: path(...)`, `offset-distance`, `offset-rotate` |
 | `transform-origin` | resolved against the view box |
-| Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists |
+| Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists, path data (`d`) |
+| Path morphing | `d` blends between paths with the same commands, absolute or relative, as SVG 2 defines; paths whose commands differ switch halfway |
+
+Animations that start one another — `begin="dot3.end+0.25s"`, which is how
+most loaders in [svg-spinners](https://github.com/n3r4zzurr0/svg-spinners) are
+built — are resolved when the SVG is compiled, `restart` included. A chain that
+restarts itself plays as a loop of the period it makes. That loop is the
+chain's settled pattern: where a run carries over into the next period, as the
+waves of a pulse do, the warm-up in the very first period, before the later
+waves have started, is not reproduced.
 
 ### Drawing
 
@@ -176,7 +185,7 @@ what a still one does through `flutter_svg`: paths and shapes, linear and radial
 gradients, patterns, `clipPath`, `mask`, text, embedded raster images, and the
 fifteen CSS blend modes.
 
-Three things that a still SVG does *not* get are handled here, because the
+Four things that a still SVG does *not* get are handled here, because the
 renderer cannot do them on its own:
 
 - **CSS in a `<style>` element** is resolved into presentation attributes. The
@@ -186,6 +195,13 @@ renderer cannot do them on its own:
 - **A `<use>` pointing at an `<image>`** is expanded into the image. The
   renderer loses an image's size through a reference and then fails the whole
   picture rather than that one element.
+- **`stroke-dashoffset` and `pathLength`** are laid out here. The compiler
+  reads neither, so the usual way of drawing a path on, a dash as long as the
+  path slid along it by animating the offset, compiled to a picture that never
+  moved. The dashes are cut with the compiler's own dasher, starting again at
+  each subpath as browsers do, and written into each frame as plain path data.
+  A dash array on its own goes the same way, which puts dots along a curve
+  where browsers put them.
 - **Translucency inside a `<mask>`** is kept. `vector_graphics` reads a mask
   by the luminance of its colour and ignores its alpha, so a `fill-opacity`
   fade in a mask, and the soft edge of every shape in one, came out opaque.
@@ -196,12 +212,10 @@ renderer cannot do them on its own:
 
 | | why |
 |---|---|
-| `<filter>` and everything in it | `vector_graphics` drops filters; the element still draws, without the effect. Where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it |
+| `<filter>` beyond blur, offset and merge | `vector_graphics_compiler` 1.3.6 and later, which need Flutter 3.41, draw `feGaussianBlur`, `feOffset` and `feMerge` — so a soft shadow or a plain glow is drawn, and its `stdDeviation`, `dx` and `dy` animate — and leave out the whole of a filter that uses any other primitive, such as the `feFlood` and `feColorMatrix` in the drop shadows design tools export. On an earlier Flutter no filter is drawn; where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it. Either way the element still draws, without the effect |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
-| Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
 | `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
-| Animating `stroke-dashoffset` | `vector_graphics` carries no dash offset, so the value changes and the drawing does not. To draw a path on, animate `stroke-dasharray` instead: growing it from `0 L` to `L 0`, where `L` is the length of the path, is the same effect and does compile. The example's "Drawn on" sample does it that way |
-| `begin` on an event or another animation | there is no interactive document to fire it |
+| `begin` on an event, `indefinite`, or another animation's repeat | there is no interactive document to fire it. A list that also holds a time, or the begin or end of another animation, keeps those |
 | CSS pseudo-classes such as `:hover` | same |
 | CSS custom properties and `var()` | left alone, so the element keeps the presentation attribute it already had |
 | `<script>` | not run |
@@ -224,9 +238,9 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | kind | what it means |
 |---|---|
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
-| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and for the two known cases says which layer dropped them: an animated `d` never reaches the frames, while a `stroke-dashoffset` reaches them and is dropped by the renderer |
+| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
-| `droppedFilter` | a `<filter>` is used, and filters are not drawn. If the whole of it is one `feGaussianBlur`, the message carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
+| `droppedFilter` | a `<filter>` is used that the renderer leaves out. Which filters those are depends on the version of `vector_graphics` the app resolves, so the compiler in use is asked rather than a list consulted: a filter it draws is not reported. The message names the primitives it does not draw. On a Flutter older than 3.41 it also says what upgrading would draw, and if the whole of a filter is one `feGaussianBlur`, it carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
 | `unclippedText` | a `clip-path` applies over `<text>`, which it will not reach; the letters draw in full from the first frame to the last |
 | `expensive` | the compiled animation came to more than 4 MB. The message says how large, over how many frames, how many of those are different pictures, and which of `frameRate` and `maxFrames` changes it |
@@ -279,7 +293,7 @@ Which to reach for:
 | | |
 |---|---|
 | **svg_animate** | Spinners, loaders, animated icons, exports from animation editors. You already use `flutter_svg` and want to keep the dependency list short. |
-| [**full_svg_flutter**](https://pub.dev/packages/full_svg_flutter) | You need filters, `d` morphing, or SVGs that carry `<script>`. It covers considerably more of the format, and bundles a QuickJS runtime and `woff2` to do it. |
+| [**full_svg_flutter**](https://pub.dev/packages/full_svg_flutter) | You need filters beyond blur, offset and merge, `d` morphing, or SVGs that carry `<script>`. It covers considerably more of the format, and bundles a QuickJS runtime and `woff2` to do it. |
 | [**anim_svg**](https://pub.dev/packages/anim_svg) | You would rather transpile to Lottie and render through the native thorvg engine. |
 | [**flutter_svg**](https://pub.dev/packages/flutter_svg) | The SVG does not animate. |
 | [**lottie**](https://pub.dev/packages/lottie), [**rive**](https://pub.dev/packages/rive) | The animation is authored in those formats to begin with. Both are far more capable than any SVG animation runtime, if you can choose the format. |

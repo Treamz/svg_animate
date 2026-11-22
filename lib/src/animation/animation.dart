@@ -134,8 +134,9 @@ class SvgAttributeAnimation {
     if (calcMode == SvgCalcMode.spline) {
       t = keySplines![index].transform(t);
     }
+    // Values that cannot blend switch halfway, as SVG and CSS both define it.
     return values[index].lerp(values[index + 1], t) ??
-        (t < 1.0 ? values[index] : values[index + 1]);
+        (t < 0.5 ? values[index] : values[index + 1]);
   }
 }
 
