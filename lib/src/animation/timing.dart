@@ -1,6 +1,8 @@
 import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
 
+import 'smil_schedule.dart';
+
 /// How the values of an animation are distributed across its duration.
 ///
 /// See https://www.w3.org/TR/SVG11/animate.html#CalcModeAttribute.
@@ -216,6 +218,8 @@ class SvgAnimationTiming {
     this.end,
     this.fill = SvgFillMode.remove,
     this.direction = SvgAnimationDirection.normal,
+    this.runs,
+    this.period,
   });
 
   /// The offset from the start of the document at which this animation begins.
@@ -243,6 +247,16 @@ class SvgAnimationTiming {
   /// equivalent of the CSS `animation-direction` property.
   final SvgAnimationDirection direction;
 
+  /// Every run of the animation, when it runs more than once or its start
+  /// depends on another animation; null for one that runs once from [begin].
+  ///
+  /// [begin] is then the start of the first run, and each run lasts as
+  /// [activeDuration] would say unless the next one cuts it short.
+  final List<SvgInterval>? runs;
+
+  /// How often [runs] repeat from the start of the document, when they do.
+  final Duration? period;
+
   /// Whether this animation never stops repeating.
   bool get repeatsIndefinitely => repeatCount == null;
 
@@ -267,6 +281,13 @@ class SvgAnimationTiming {
   ///
   /// Used to work out how long the whole document takes.
   Duration? get activeEnd {
+    final List<SvgInterval>? runs = this.runs;
+    if (runs != null) {
+      if (period != null || runs.isEmpty) {
+        return period != null ? null : Duration.zero;
+      }
+      return runs.last.end;
+    }
     final Duration? duration = activeDuration;
     return duration == null ? null : begin + duration;
   }
@@ -279,10 +300,21 @@ class SvgAnimationTiming {
       other.repeatCount == repeatCount &&
       other.end == end &&
       other.fill == fill &&
-      other.direction == direction;
+      other.direction == direction &&
+      listEquals(other.runs, runs) &&
+      other.period == period;
 
   @override
-  int get hashCode => Object.hash(begin, simpleDuration, repeatCount, end, fill, direction);
+  int get hashCode => Object.hash(
+    begin,
+    simpleDuration,
+    repeatCount,
+    end,
+    fill,
+    direction,
+    runs == null ? null : Object.hashAll(runs!),
+    period,
+  );
 }
 
 /// The position of an animation at a point in time.
@@ -306,7 +338,32 @@ class SvgAnimationSample {
 /// Returns null when the animation is not contributing a value at [time],
 /// either because it has not begun or because it has ended and does not freeze.
 SvgAnimationSample? sampleTiming(SvgAnimationTiming timing, Duration time) {
-  if (time < timing.begin) {
+  Duration now = time;
+  Duration start = timing.begin;
+  Duration? activeDuration = timing.activeDuration;
+  final List<SvgInterval>? runs = timing.runs;
+  if (runs != null) {
+    now = _steadyTime(runs, timing.period, time);
+    // The latest run to have begun is the one that decides, whether it is
+    // still going or has ended and left a frozen value behind.
+    SvgInterval? run;
+    for (final SvgInterval candidate in runs) {
+      if (candidate.begin > now) {
+        break;
+      }
+      run = candidate;
+    }
+    if (run == null) {
+      return null;
+    }
+    start = run.begin;
+    activeDuration = run.end == null ? null : run.end! - run.begin;
+    if (activeDuration != null &&
+        now - start >= activeDuration &&
+        timing.fill == SvgFillMode.remove) {
+      return null;
+    }
+  } else if (time < timing.begin) {
     return null;
   }
   final Duration simpleDuration = timing.simpleDuration ?? Duration.zero;
@@ -316,8 +373,7 @@ SvgAnimationSample? sampleTiming(SvgAnimationTiming timing, Duration time) {
     return const SvgAnimationSample(0, 0);
   }
 
-  Duration localTime = time - timing.begin;
-  final Duration? activeDuration = timing.activeDuration;
+  Duration localTime = now - start;
   if (activeDuration != null && localTime >= activeDuration) {
     if (timing.fill == SvgFillMode.remove) {
       return null;
@@ -339,6 +395,60 @@ SvgAnimationSample? sampleTiming(SvgAnimationTiming timing, Duration time) {
     }
   }
   return SvgAnimationSample(_applyDirection(timing.direction, fraction, iteration), iteration);
+}
+
+/// When the run that decides [timing]'s value at [time] began, measured on the
+/// same clock as [time]; null when nothing has begun yet.
+///
+/// SMIL gives the animation whose run began last the final say over an
+/// attribute, which matters once runs restart: a frozen value left by an
+/// earlier run gives way to whichever animation started after it.
+Duration? runBeginAt(SvgAnimationTiming timing, Duration time) {
+  final List<SvgInterval>? runs = timing.runs;
+  if (runs == null) {
+    return time < timing.begin ? null : timing.begin;
+  }
+  final Duration now = _steadyTime(runs, timing.period, time);
+  SvgInterval? run;
+  for (final SvgInterval candidate in runs) {
+    if (candidate.begin > now) {
+      break;
+    }
+    run = candidate;
+  }
+  return run == null ? null : run.begin - (now - time);
+}
+
+/// Moves [time] on by whole periods until the runs that started in earlier
+/// periods have had time to reach it.
+///
+/// A chain of animations that restart one another warms up: in the first
+/// period, the ones that start later have not started yet, while in every
+/// period after it the runs begun in the one before are still going. A
+/// document is played as one loop, so the loop is taken from that settled
+/// pattern rather than from the warm-up, which would otherwise be repeated
+/// for ever.
+Duration _steadyTime(List<SvgInterval> runs, Duration? period, Duration time) {
+  if (period == null || period <= Duration.zero || runs.isEmpty) {
+    return time;
+  }
+  var longest = Duration.zero;
+  for (final SvgInterval run in runs) {
+    final Duration? end = run.end;
+    if (end == null) {
+      return time;
+    }
+    if (end - run.begin > longest) {
+      longest = end - run.begin;
+    }
+  }
+  final Duration settled = runs.first.begin + longest;
+  if (time >= settled) {
+    return time;
+  }
+  final int periods = ((settled - time).inMicroseconds / period.inMicroseconds).ceil();
+  final Duration shifted = time + period * periods;
+  return shifted + period <= scheduleHorizon ? shifted : time;
 }
 
 double _applyDirection(SvgAnimationDirection direction, double fraction, int iteration) {

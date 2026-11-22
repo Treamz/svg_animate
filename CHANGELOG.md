@@ -1,3 +1,25 @@
+## Unreleased
+
+* Plays animations that start one another. A `begin` naming the begin or the
+  end of another animation, such as `begin="0;dot3.end+0.25s"`, was read as its
+  first time and the rest dropped, and an animation whose `begin` held only such
+  a reference was dropped entirely, without a diagnostic. That is how most
+  loaders are built: of the 46 icons in svg-spinners, 24 do it, and 23 of those
+  played one pass and stopped, with most of their dots never moving. `begin`
+  lists are now resolved for the whole document when it is compiled — several
+  times, the begin or end of another animation plus or minus an offset, and
+  `restart` — and a chain that restarts itself loops on the period it makes,
+  3-dots-bounce on 1.05 s. Checked against Chrome frame by frame: after the first
+  loop, 107 of 107 sampled frames of those 24 spinners match it, up from 17, and
+  948 of 948 frames of the 158 Meteocons icons that use such chains, up from
+  859. In the first loop a chain whose runs overlap its own period shows its
+  settled pattern rather than its warm-up, which is the one known difference.
+  Documents without such `begin` values compile exactly as before.
+* When several animations of one attribute take turns, the one whose run began
+  last now wins, as SMIL specifies. This only changes documents with the
+  restarting chains above, where a frozen value left by an earlier run used to
+  win over a later animation written before it.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
