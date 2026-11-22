@@ -50,8 +50,7 @@ const int _maxIntervals = 20000;
 /// skip; see [_dashSubpath].
 const double _sliver = 1e-4;
 
-/// Stroke dash patterns that need `stroke-dashoffset` or `pathLength`, laid out
-/// as geometry before the compiler sees them.
+/// Stroke dash patterns, laid out as geometry before the compiler sees them.
 ///
 /// `vector_graphics_compiler` reads `stroke-dashoffset` and then never uses it,
 /// so the usual way of drawing a path on — a dash as long as the path, slid
@@ -67,22 +66,25 @@ const double _sliver = 1e-4;
 /// compiler only has to stroke. Using its dasher rather than another one keeps
 /// a dash's ends exactly where the compiler would have put them.
 ///
-/// Only shapes with an offset somewhere above them, or a `pathLength`, are
-/// touched. A dash array on its own compiles the way it always has.
+/// A dash array on its own is laid out here too. The compiler measures a curve
+/// as its chord wherever the curve stays within 1.5 units of it, so dots along
+/// an arc drift further from where browsers put them the further along the arc
+/// they are, and the pattern runs on across subpaths there as well. line-md's
+/// `downloading` and `uploading` spin a dotted half circle that way.
 class DashedStrokes {
   DashedStrokes._(this._shapes);
 
   /// Finds the shapes in [document] whose dashes this has to lay out.
   ///
-  /// [offsetTargets] are the elements whose `stroke-dashoffset` is animated,
-  /// which may not have one in the markup.
-  factory DashedStrokes.find(XmlDocument document, Set<XmlElement> offsetTargets) {
+  /// [dashTargets] are the elements whose `stroke-dasharray` or
+  /// `stroke-dashoffset` is animated, which may not have one in the markup.
+  factory DashedStrokes.find(XmlDocument document, Set<XmlElement> dashTargets) {
     final shapes = <XmlElement>[];
     for (final XmlElement element in document.descendantElements) {
       if (!_shapeNames.contains(element.name.local)) {
         continue;
       }
-      if (element.getAttribute('pathLength') != null || _hasOffsetAbove(element, offsetTargets)) {
+      if (element.getAttribute('pathLength') != null || _hasDashesAbove(element, dashTargets)) {
         shapes.add(element);
       }
     }
@@ -653,9 +655,11 @@ String? _inherited(XmlElement element, String name) {
   return null;
 }
 
-bool _hasOffsetAbove(XmlElement element, Set<XmlElement> offsetTargets) {
+bool _hasDashesAbove(XmlElement element, Set<XmlElement> dashTargets) {
   for (XmlNode? node = element; node is XmlElement; node = node.parent) {
-    if (offsetTargets.contains(node) || node.getAttribute('stroke-dashoffset') != null) {
+    if (dashTargets.contains(node) ||
+        node.getAttribute('stroke-dasharray') != null ||
+        node.getAttribute('stroke-dashoffset') != null) {
       return true;
     }
   }

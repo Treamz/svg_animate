@@ -191,7 +191,8 @@ renderer cannot do them on its own:
   path slid along it by animating the offset, compiled to a picture that never
   moved. The dashes are cut with the compiler's own dasher, starting again at
   each subpath as browsers do, and written into each frame as plain path data.
-  A dash array with no offset or `pathLength` compiles as it always has.
+  A dash array on its own goes the same way, which puts dots along a curve
+  where browsers put them.
 
 ### What is not supported
 

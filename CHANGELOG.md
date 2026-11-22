@@ -13,10 +13,12 @@
   six moments of each of those 1167 icons, 4611 of 7002 frames now match where
   791 did, and 599 icons match at all six where none did. What still differs is
   almost all morphing of `d` and opacity inside a `<mask>`, which this does not
-  touch. The 28 Meteocons wind icons that drew one still frame now move; they
-  were not compared with Chrome frame by frame. A dash array with no offset or
-  `pathLength` compiles as it did. Where it applies it costs compile time:
-  line-md went from 3.9 s to 4.7 s in one measurement.
+  touch. The 28 Meteocons wind icons that drew one still frame now move, and
+  match Chrome at 222 of 240 frames where they matched at 119. A dash array
+  with no offset is laid out the same way: the compiler measures a curve as its
+  chord, so dots along an arc drifted, which line-md's `downloading` and
+  `uploading` show. Where it applies it costs compile time: line-md went from
+  3.9 s to 4.7 s in one measurement.
 
 * Starts an animation with no `from` at the value an inherited property takes
   from its parent. Only the element's own attribute was read, so a path

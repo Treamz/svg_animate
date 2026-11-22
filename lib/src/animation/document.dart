@@ -231,7 +231,9 @@ class AnimatedSvgDocument {
 
     final dashedStrokes = DashedStrokes.find(document, <XmlElement>{
       for (final _AnimationTarget target in targets)
-        if (target.attributeName == 'stroke-dashoffset') target.element,
+        if (target.attributeName == 'stroke-dashoffset' ||
+            target.attributeName == 'stroke-dasharray')
+          target.element,
     });
 
     final _DocumentTiming timing = _documentTiming(targets);

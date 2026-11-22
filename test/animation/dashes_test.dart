@@ -153,12 +153,27 @@ void main() {
     });
   });
 
-  test('a dash array with no offset or pathLength is left to the compiler', () {
-    // Nothing to fix, and it compiles exactly as it did before.
+  test('a dash array with no offset is laid out as well', () {
+    // The compiler would carry the pattern from the first stroke into the
+    // second, which would then start 2 units into a gap.
+    final XmlElement path = elements(
+      at('''
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10">
+  <path d="M0 2 H6 M0 8 H6" stroke="#000" fill="none" stroke-dasharray="4">
+    <animate attributeName="stroke-width" from="1" to="2" dur="1s"/>
+  </path>
+</svg>''', 0),
+      'path',
+    ).single;
+
+    expect(path.getAttribute('d'), 'M0 2L4 2M0 8L4 8');
+  });
+
+  test('a shape with no dashes anywhere above it is left alone', () {
     final XmlElement path = elements(
       at('''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 4">
-  <path d="M0 2 H20" stroke="#000" fill="none" stroke-dasharray="4">
+  <path d="M0 2 H20" stroke="#000" fill="none">
     <animate attributeName="stroke-width" from="1" to="2" dur="1s"/>
   </path>
 </svg>''', 0),
@@ -166,6 +181,5 @@ void main() {
     ).single;
 
     expect(path.getAttribute('d'), 'M0 2 H20');
-    expect(path.getAttribute('stroke-dasharray'), '4');
   });
 }
