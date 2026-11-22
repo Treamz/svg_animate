@@ -45,6 +45,37 @@ void main() {
   });
 
   group('<animate>', () {
+    test('with keyTimes that do not fit its values does not run, as in Chrome', () {
+      // Out of order, too few, not starting at 0, and blending values that do
+      // not end at 1: SMIL puts each animation in error, and Chrome leaves x
+      // at 5 for all four.
+      final document = AnimatedSvgDocument.parse(
+        svgWith(
+          '''
+<rect id="a" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.8;0.3" dur="1s"/></rect>
+<rect id="b" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.5" dur="1s"/></rect>
+<rect id="c" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0.1;0.5;1" dur="1s"/></rect>
+<rect id="d" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.5;0.9" dur="1s"/></rect>''',
+        ),
+      );
+      const time = Duration(milliseconds: 600);
+
+      for (final String id in <String>['a', 'b', 'c', 'd']) {
+        expect(attributeAt(document, time, id, 'x'), '5', reason: id);
+      }
+    });
+
+    test('with discrete keyTimes that stop short of 1 still runs', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+<rect id="r" x="5" width="10" height="10">
+  <animate attributeName="x" values="0;10" keyTimes="0;0.5" calcMode="discrete" dur="1s"/>
+</rect>'''),
+      );
+
+      expect(attributeAt(document, const Duration(milliseconds: 600), 'r', 'x'), '10');
+    });
+
     test('interpolates between from and to', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''

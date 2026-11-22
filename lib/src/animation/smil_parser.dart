@@ -126,8 +126,21 @@ SvgAttributeAnimation? _parseAnimationElement(
     calcMode = SvgCalcMode.discrete;
   }
 
+  List<double>? authoredKeyTimes;
+  final String? rawKeyTimes = attributeByLocalName(element, 'keyTimes');
+  if (rawKeyTimes != null && elementName != 'set' && calcMode != SvgCalcMode.paced) {
+    authoredKeyTimes = _parseKeyTimes(rawKeyTimes, values.length, calcMode);
+    if (authoredKeyTimes == null) {
+      // SMIL puts an animation whose keyTimes do not fit its values in error,
+      // and an animation in error does not run. Chrome leaves the attribute at
+      // its own value; running it over evenly spaced times instead plays
+      // motion the file never had, such as line-md's compass needle, whose
+      // keyTimes go back from 0.8 to 0.3.
+      return null;
+    }
+  }
   List<double> keyTimes =
-      _parseKeyTimes(element, values.length) ??
+      authoredKeyTimes ??
       (calcMode == SvgCalcMode.discrete
           ? discreteKeyTimes(values.length)
           : evenKeyTimes(values.length));
@@ -356,18 +369,17 @@ List<AnimatableValue>? _parseValues(
   return null;
 }
 
-List<double>? _parseKeyTimes(XmlElement element, int expectedLength) {
-  final String? raw = attributeByLocalName(element, 'keyTimes');
-  if (raw == null) {
-    return null;
-  }
+/// The keyTimes [raw] describes, or null when they are in error: not one per
+/// value, not starting at 0, going backwards, outside 0 to 1, or, where values
+/// blend, not ending at 1.
+List<double>? _parseKeyTimes(String raw, int expectedLength, SvgCalcMode calcMode) {
   final keyTimes = <double>[];
   for (final String token in raw.split(';')) {
     if (token.trim().isEmpty) {
       continue;
     }
     final double? value = double.tryParse(token.trim());
-    if (value == null) {
+    if (value == null || value < 0 || value > 1) {
       return null;
     }
     keyTimes.add(value);
@@ -379,6 +391,9 @@ List<double>? _parseKeyTimes(XmlElement element, int expectedLength) {
     if (keyTimes[i] < keyTimes[i - 1]) {
       return null;
     }
+  }
+  if (calcMode != SvgCalcMode.discrete && keyTimes.length > 1 && keyTimes.last != 1) {
+    return null;
   }
   return keyTimes;
 }
