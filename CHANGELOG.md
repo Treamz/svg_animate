@@ -1,5 +1,22 @@
 ## Unreleased
 
+* Morphs `d`. Path data was held as a single keyword, so an animated `d` kept
+  its first shape until the very end of each step and a looping morph never
+  left it, which reported `neverChanges`. Two paths with the same commands now
+  blend number by number, whether each is written absolute or relative, and an
+  arc's flags switch halfway, as SVG 2 defines and Chrome draws. Paths whose
+  commands differ switch halfway through the step. line-md grows bars and
+  opens shapes this way in 428 of its icons. Against Chrome at six frame times
+  of 372 of them, frames that match went from 187 to 295 of 2232 on their own,
+  and from 806 to 1017 together with the dash offset change. Most of what still
+  differs in those icons is opacity inside a `<mask>`, which the compiler
+  draws opaque.
+
+* Switches a value that cannot be interpolated halfway through each step,
+  instead of at its end. SVG and CSS both put the switch there, and Chrome
+  draws it there: `visibility` animated from `hidden` to `visible` over a
+  second now shows at half a second, not at the end.
+
 * Does not run an animation whose `keyTimes` do not fit its values: not one
   per value, not starting at 0, going backwards, outside 0 to 1, or, for
   values that blend, not ending at 1. SMIL puts such an animation in error and
@@ -15,6 +32,69 @@
   their middle. Together with the other open changes, line-md now matches
   Chrome at 5415 of 5430 frames of the icons whose length does not change,
   where it matched at 5385.
+
+## 0.7.0
+
+* Stops reporting filters that are drawn. `vector_graphics_compiler` 1.3.6,
+  which needs Flutter 3.41, draws `feGaussianBlur`, `feOffset` and `feMerge`,
+  and an app on a current Flutter resolves it — but `droppedFilter` went on
+  saying that no filter is drawn, so a blur plainly on the screen was reported
+  as missing, and the README said the same. Whether a filter is drawn is now
+  asked of the compiler the app actually resolved, one kind of primitive at a
+  time: two encodes of a sixteen-pixel picture per kind, about 0.2 ms in a debug
+  build. A filter it draws is not reported. One it leaves out is reported with
+  the primitives that cause it, such as the `feFlood` and `feColorMatrix` in the
+  drop shadows design tools export, since the compiler leaves out the whole of a
+  filter when it does not draw every primitive in it. On a Flutter older than
+  3.41 the message also says what upgrading would draw.
+* The example's sample of a filter that is left out is a coloured glow now,
+  since the plain blur it used to be is drawn.
+* Plays animations that start one another. A `begin` naming the begin or the
+  end of another animation, such as `begin="0;dot3.end+0.25s"`, was read as its
+  first time and the rest dropped, and an animation whose `begin` held only such
+  a reference was dropped entirely, without a diagnostic. That is how most
+  loaders are built: of the 46 icons in svg-spinners, 24 do it, and 23 of those
+  played one pass and stopped, with most of their dots never moving. `begin`
+  lists are now resolved for the whole document when it is compiled — several
+  times, the begin or end of another animation plus or minus an offset, and
+  `restart` — and a chain that restarts itself loops on the period it makes,
+  3-dots-bounce on 1.05 s. Checked against Chrome frame by frame: after the first
+  loop, 107 of 107 sampled frames of those 24 spinners match it, up from 17, and
+  948 of 948 frames of the 158 Meteocons icons that use such chains, up from
+  859. In the first loop a chain whose runs overlap its own period shows its
+  settled pattern rather than its warm-up, which is the one known difference.
+  Documents without such `begin` values compile exactly as before.
+* When several animations of one attribute take turns, the one whose run began
+  last now wins, as SMIL specifies. This only changes documents with the
+  restarting chains above, where a frozen value left by an earlier run used to
+  win over a later animation written before it.
+* Draws `stroke-dashoffset`, and `pathLength` with it. `vector_graphics_compiler`
+  reads the offset and never uses it, so the usual way of drawing a path on, a
+  dash as long as the path slid along it by animating the offset, compiled to
+  one frame repeated and reported `neverChanges`. 1167 of line-md's 1233 icons
+  animate this way, as do the wind icons in Meteocons and many hand-written
+  SVGs. The dashes are now cut before the compiler sees them, with its own
+  dasher run on a pattern already moved by the offset, and written into each
+  frame as plain path data. The pattern also starts again at every subpath, as
+  browsers draw it, where the compiler ran it on from the last one; line-md's
+  icons that draw two strokes in one path rely on that. Compared with Chrome at
+  six moments of each of those 1167 icons, 4611 of 7002 frames now match where
+  791 did, and 599 icons match at all six where none did. What still differs is
+  almost all morphing of `d` and opacity inside a `<mask>`, which this does not
+  touch. The 28 Meteocons wind icons that drew one still frame now move, and
+  match Chrome at 222 of 240 frames where they matched at 119. A dash array
+  with no offset is laid out the same way: the compiler measures a curve as its
+  chord, so dots along an arc drifted, which line-md's `downloading` and
+  `uploading` show. Where it applies it costs compile time: line-md went from
+  3.9 s to 4.7 s in one measurement.
+
+* Starts an animation with no `from` at the value an inherited property takes
+  from its parent. Only the element's own attribute was read, so a path
+  animated `to="0"` under a group that sets `stroke-dashoffset`, or a mask path
+  faded `to="1"` under a group that sets `fill-opacity`, found nothing to start
+  from and the animation was dropped without a word. Icon sets write it that
+  way: in line-md the fade in `map-marker-multiple-alt-filled` now plays, and
+  the document is 0.8 s long instead of 0.4 s, as in a browser.
 
 ## 0.6.3
 
