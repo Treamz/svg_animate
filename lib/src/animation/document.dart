@@ -6,6 +6,7 @@ import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
 import 'diagnostics.dart';
+import 'element_opacity.dart';
 import 'expand_use.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
@@ -108,6 +109,7 @@ class AnimatedSvgDocument {
     this._document,
     this._targets,
     this._roundedRects,
+    this._inheritedStrokes,
     this.duration,
     this.loops,
   );
@@ -232,13 +234,26 @@ class AnimatedSvgDocument {
       }
     }
 
+    final inheritedStrokes = InheritedStrokes.find(document, <XmlElement>{
+      for (final _AnimationTarget target in targets)
+        if (target.attributeName == 'opacity') target.element,
+    });
+
     final _DocumentTiming timing = _documentTiming(targets);
-    return AnimatedSvgDocument._(document, targets, roundedRects, timing.duration, timing.loops);
+    return AnimatedSvgDocument._(
+      document,
+      targets,
+      roundedRects,
+      inheritedStrokes,
+      timing.duration,
+      timing.loops,
+    );
   }
 
   final XmlDocument _document;
   final List<_AnimationTarget> _targets;
   final List<_RoundedRect> _roundedRects;
+  final InheritedStrokes _inheritedStrokes;
 
   /// What this document contains that will not survive being compiled.
   ///
@@ -279,7 +294,13 @@ class AnimatedSvgDocument {
     for (final _RoundedRect rect in _roundedRects) {
       rect.clamp();
     }
-    return _document.toXmlString();
+    if (_inheritedStrokes.isEmpty) {
+      return _document.toXmlString();
+    }
+    final void Function() restore = _inheritedStrokes.apply();
+    final String markup = _document.toXmlString();
+    restore();
+    return markup;
   }
 }
 

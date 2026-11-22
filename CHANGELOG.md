@@ -1,3 +1,15 @@
+## Unreleased
+
+* Applies a shape's own `opacity` to a stroke it inherits. The compiler folds a
+  shape's `opacity` into its paint, and for the stroke only when the shape
+  names its own stroke colour, so a path that took its stroke from a group drew
+  at full strength whatever its `opacity` said. Icon sets hide a path with
+  `opacity="0"` until a `<set>` shows it, and those paths were there from the
+  first frame. The inherited stroke, and any inherited `stroke-opacity`, is now
+  written onto such a shape in each frame. Against Chrome at six frame times of
+  every line-md icon with an offset, frames that match went from 6383 to 6721
+  of 7002 together with the dash offset, `d` and mask changes; none got worse.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
