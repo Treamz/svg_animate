@@ -5,12 +5,14 @@ import 'package:xml/xml.dart';
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
+import 'dashes.dart';
 import 'diagnostics.dart';
 import 'element_opacity.dart';
 import 'expand_use.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
+import 'timing.dart' show runBeginAt;
 import 'values.dart';
 
 /// A `<rect>` whose corner radius has to be kept within the size it is drawn at.
@@ -110,6 +112,7 @@ class AnimatedSvgDocument {
     this._targets,
     this._roundedRects,
     this._inheritedStrokes,
+    this._dashedStrokes,
     this.duration,
     this.loops,
   );
@@ -177,12 +180,7 @@ class AnimatedSvgDocument {
     }
 
     animations.addAll(
-      parseSmilAnimations(
-        document,
-        elementsById: elementsById,
-        baseValueOf: (XmlElement element, String attributeName) =>
-            element.getAttribute(attributeName),
-      ),
+      parseSmilAnimations(document, elementsById: elementsById, baseValueOf: _underlyingValue),
     );
     for (final XmlElement element in document.descendantElements.toList()) {
       if (smilAnimationElements.contains(element.name.local)) {
@@ -239,12 +237,20 @@ class AnimatedSvgDocument {
         if (target.attributeName == 'opacity') target.element,
     });
 
+    final dashedStrokes = DashedStrokes.find(document, <XmlElement>{
+      for (final _AnimationTarget target in targets)
+        if (target.attributeName == 'stroke-dashoffset' ||
+            target.attributeName == 'stroke-dasharray')
+          target.element,
+    });
+
     final _DocumentTiming timing = _documentTiming(targets);
     return AnimatedSvgDocument._(
       document,
       targets,
       roundedRects,
       inheritedStrokes,
+      dashedStrokes,
       timing.duration,
       timing.loops,
     );
@@ -254,6 +260,7 @@ class AnimatedSvgDocument {
   final List<_AnimationTarget> _targets;
   final List<_RoundedRect> _roundedRects;
   final InheritedStrokes _inheritedStrokes;
+  final DashedStrokes _dashedStrokes;
 
   /// What this document contains that will not survive being compiled.
   ///
@@ -294,12 +301,16 @@ class AnimatedSvgDocument {
     for (final _RoundedRect rect in _roundedRects) {
       rect.clamp();
     }
-    if (_inheritedStrokes.isEmpty) {
+    if (_inheritedStrokes.isEmpty && _dashedStrokes.isEmpty) {
       return _document.toXmlString();
     }
-    final void Function() restore = _inheritedStrokes.apply();
+    // Each pass edits the shared document for this one frame and is undone,
+    // the later one first.
+    final void Function() restoreStrokes = _inheritedStrokes.apply();
+    final void Function() restoreDashes = _dashedStrokes.apply();
     final String markup = _document.toXmlString();
-    restore();
+    restoreDashes();
+    restoreStrokes();
     return markup;
   }
 }
@@ -319,10 +330,27 @@ class _AnimationTarget {
 
   late final AnimatableValue? baseParsed;
 
+  /// The animations on this attribute, lowest priority first.
+  ///
+  /// Document order, which is SMIL's order for animations that begin together,
+  /// unless one of them runs more than once: then whichever run began last
+  /// wins, as SMIL has it. Only then, so that documents whose animations each
+  /// run once are combined exactly as they always have been.
+  Iterable<SvgAttributeAnimation> _inPriorityOrder(Duration time) {
+    if (animations.length < 2 || !animations.any((a) => a.timing.runs != null)) {
+      return animations;
+    }
+    final keyed = <(Duration, int, SvgAttributeAnimation)>[
+      for (var i = 0; i < animations.length; i++)
+        (runBeginAt(animations[i].timing, time) ?? _beforeEverything, i, animations[i]),
+    ]..sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    return keyed.map((e) => e.$3);
+  }
+
   void applyAt(Duration time) {
     AnimatableValue? current = baseParsed;
     var wroteAnything = false;
-    for (final SvgAttributeAnimation animation in animations) {
+    for (final SvgAttributeAnimation animation in _inPriorityOrder(time)) {
       final AnimatableValue? value = animation.valueAt(time);
       if (value == null) {
         continue;
@@ -353,6 +381,45 @@ class _AnimationTarget {
 
   String _withOrigin(String transform) =>
       attributeName == 'transform' && origin != null ? _aboutOrigin(transform, origin!) : transform;
+}
+
+/// The presentation properties an element takes from its parent when it does
+/// not set them itself.
+const Set<String> _inheritedProperties = <String>{
+  'color',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-opacity',
+  'stroke-width',
+  'visibility',
+};
+
+/// The value an animation without a `from` starts from: the element's own, or
+/// for an inherited property, the one it takes from the nearest ancestor that
+/// sets it.
+///
+/// Icon sets set `stroke-dashoffset` once on a group and animate each path in
+/// it `to="0"`. Reading only the path's own attribute found nothing there, so
+/// the animation was dropped and the path stayed where the group put it.
+String? _underlyingValue(XmlElement element, String attributeName) {
+  final String? own = element.getAttribute(attributeName);
+  if (own != null || !_inheritedProperties.contains(attributeName)) {
+    return own;
+  }
+  for (XmlNode? node = element.parent; node is XmlElement; node = node.parent) {
+    final String? value = node.getAttribute(attributeName);
+    if (value != null && value.trim() != 'inherit') {
+      return value;
+    }
+  }
+  return null;
 }
 
 /// Rewrites [transform] so that it is applied about [origin] rather than the
@@ -437,6 +504,8 @@ bool _canWriteAsAttribute(String property, String value) {
       !value.contains('var(');
 }
 
+const Duration _beforeEverything = Duration(days: -365);
+
 class _DocumentTiming {
   const _DocumentTiming(this.duration, this.loops);
 
@@ -466,8 +535,11 @@ _DocumentTiming _documentTiming(List<_AnimationTarget> targets) {
         continue;
       }
       hasIndefinite = true;
-      if (simpleDuration > Duration.zero) {
-        loopMicroseconds = _leastCommonMultiple(loopMicroseconds, simpleDuration.inMicroseconds);
+      // An animation restarted by others on a cycle repeats on that cycle,
+      // whatever its own duration.
+      final Duration loop = animation.timing.period ?? simpleDuration;
+      if (loop > Duration.zero) {
+        loopMicroseconds = _leastCommonMultiple(loopMicroseconds, loop.inMicroseconds);
       }
     }
   }

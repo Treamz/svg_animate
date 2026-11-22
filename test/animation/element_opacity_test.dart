@@ -93,4 +93,27 @@ void main() {
     );
     expect(document.sampleAt(Duration.zero), contains('<path d="M0 50H100"/>'));
   });
+  test('a dashed path hidden with opacity under a stroked group stays hidden', () async {
+    // Dashes with an offset are laid out before the compiler sees them; the
+    // stroke they are cut from has to carry the path's opacity with it, both
+    // when the path is rewritten in place and when a filled path gets a
+    // stroke of its own beside it.
+    for (final String fill in <String>['none', '#000']) {
+      final int red = await strokeAt(
+        '<g stroke="#000" stroke-width="20"><path d="M0 50H100" fill="$fill" opacity="0" '
+        'stroke-dasharray="100" stroke-dashoffset="-40"/></g>$ticking',
+      );
+
+      expect(red, 255, reason: 'fill $fill');
+    }
+  });
+
+  test('a dashed path under a stroked group still draws without an opacity', () async {
+    final int red = await strokeAt(
+      '<g stroke="#000" stroke-width="20" fill="none"><path d="M0 50H100" '
+      'stroke-dasharray="100" stroke-dashoffset="-40"/></g>$ticking',
+    );
+
+    expect(red, 0);
+  });
 }
