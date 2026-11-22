@@ -159,7 +159,7 @@ want.
 | `<animateMotion>` | `path` and `<mpath>`, `rotate="auto"` / `auto-reverse` |
 | `<set>` | yes |
 | `calcMode` | `linear`, `discrete`, `paced`, `spline` |
-| Timing | `begin` (offsets), `dur`, `end`, `repeatCount`, `repeatDur`, `fill` |
+| Timing | `begin` (offsets, lists of them, and the `begin` or `end` of another animation plus an offset), `dur`, `end`, `repeatCount`, `repeatDur`, `fill`, `restart` |
 | Composition | `additive="sum"`, `accumulate="sum"` |
 | Targeting | `href` / `xlink:href`, or the parent element |
 | CSS `@keyframes` | `animation` shorthand and every longhand, per-keyframe `animation-timing-function` |
@@ -168,6 +168,14 @@ want.
 | CSS motion paths | `offset-path: path(...)`, `offset-distance`, `offset-rotate` |
 | `transform-origin` | resolved against the view box |
 | Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists |
+
+Animations that start one another — `begin="dot3.end+0.25s"`, which is how
+most loaders in [svg-spinners](https://github.com/n3r4zzurr0/svg-spinners) are
+built — are resolved when the SVG is compiled, `restart` included. A chain that
+restarts itself plays as a loop of the period it makes. That loop is the
+chain's settled pattern: where a run carries over into the next period, as the
+waves of a pulse do, the warm-up in the very first period, before the later
+waves have started, is not reproduced.
 
 ### Drawing
 
@@ -196,7 +204,7 @@ renderer cannot do them on its own:
 | Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
 | `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
 | Animating `stroke-dashoffset` | `vector_graphics` carries no dash offset, so the value changes and the drawing does not. To draw a path on, animate `stroke-dasharray` instead: growing it from `0 L` to `L 0`, where `L` is the length of the path, is the same effect and does compile. The example's "Drawn on" sample does it that way |
-| `begin` on an event or another animation | there is no interactive document to fire it |
+| `begin` on an event, `indefinite`, or another animation's repeat | there is no interactive document to fire it. A list that also holds a time, or the begin or end of another animation, keeps those |
 | CSS pseudo-classes such as `:hover` | same |
 | CSS custom properties and `var()` | left alone, so the element keeps the presentation attribute it already had |
 | `<script>` | not run |
