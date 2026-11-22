@@ -8,6 +8,7 @@ import 'css_animations.dart';
 import 'dashes.dart';
 import 'diagnostics.dart';
 import 'expand_use.dart';
+import 'masks.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
@@ -185,6 +186,7 @@ class AnimatedSvgDocument {
         element.remove();
       }
     }
+    backMasks(document);
 
     final targets = <_AnimationTarget>[];
     final targetsByKey = <(XmlElement, String), _AnimationTarget>{};

@@ -17,6 +17,17 @@
   draws it there: `visibility` animated from `hidden` to `visible` over a
   second now shows at half a second, not at the end.
 
+* Keeps translucency inside a `<mask>`. `vector_graphics` turns a mask into
+  coverage by the luminance of each pixel's colour and ignores its alpha, so
+  white at 30% opacity covered fully: a mask that fades in with
+  `fill-opacity` was fully on from its first frame, and the antialiased edge
+  of every shape in a mask was hard. Each luminance mask now gets an opaque
+  black backing under its content, which is the same mask by SVG's definition,
+  luminance times alpha, and leaves every pixel opaque with its coverage in its
+  colour. line-md uses masks in 470 icons. Against Chrome at six frame times
+  of 447 of them, frames that match went from 71 to 460 of 2682 on their own,
+  and from 765 to 2326 together with the dash offset and `d` changes. `mask-type="alpha"` masks are left as they were.
+
 ## 0.7.0
 
 * Stops reporting filters that are drawn. `vector_graphics_compiler` 1.3.6,
