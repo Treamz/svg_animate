@@ -1,4 +1,4 @@
-## Unreleased
+## 0.8.0
 
 * Morphs `d`. Path data was held as a single keyword, so an animated `d` kept
   its first shape until the very end of each step and a looping morph never
