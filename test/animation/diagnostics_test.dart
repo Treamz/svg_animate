@@ -278,23 +278,22 @@ void main() {
       // worse than silence.
       final List<SvgAnimateDiagnostic> found = await diagnose('''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20">
-  <path d="M5 10 L95 10" stroke="#f00" stroke-dasharray="90" stroke-dashoffset="90">
-    <animate attributeName="stroke-dashoffset" from="90" to="0" dur="1s"
-             repeatCount="indefinite"/>
+  <path d="M0 0 L10 0 L10 10 Z" fill="#f00">
+    <animate attributeName="d" to="M0 0 L20 0 L20 20 Z" dur="1s" repeatCount="indefinite"/>
   </path>
 </svg>''');
 
       final SvgAnimateDiagnostic still = found.firstWhere(
         (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
       );
-      expect(still.message, contains('"stroke-dasharray"'));
+      expect(still.message, contains('"d"'));
       expect(still.message, isNot(contains('single value')));
     });
 
-    test('names an animated stroke-dashoffset, and the way round it', () async {
-      // The one worth naming. Drawing a path on is normally written this way,
-      // the values are written into every frame correctly, and the renderer
-      // carries no dash offset — so nothing moves and nothing says why.
+    test('says nothing about a dash offset, which now draws', () async {
+      // Drawing a path on is normally written this way. The compiler carries no
+      // dash offset, so this used to compile to one frame repeated; the dashes
+      // are now laid out before it sees them.
       final List<SvgAnimateDiagnostic> found = await diagnose('''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20">
   <path d="M5 10 L95 10" stroke="#f00" stroke-width="4" fill="none"
@@ -304,12 +303,10 @@ void main() {
   </path>
 </svg>''');
 
-      final SvgAnimateDiagnostic still = found.firstWhere(
-        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
+      expect(
+        found.map((SvgAnimateDiagnostic d) => d.kind),
+        isNot(contains(SvgAnimateDiagnosticKind.neverChanges)),
       );
-      expect(still.message, contains('"stroke-dashoffset"'));
-      expect(still.message, contains('"stroke-dasharray"'));
-      expect(still.message, contains('0 L'), reason: 'the way round it, not just the name');
     });
 
     test('says an animated d never reaches the frames at all', () async {
