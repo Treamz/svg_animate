@@ -228,14 +228,13 @@ void main() {
     test('reports an animation whose every frame draws the same picture', () async {
       final List<SvgAnimateDiagnostic> found = await diagnose('''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path d="M0 0 L10 0 L10 10 Z" fill="#f00">
-    <animate attributeName="d" dur="1s" repeatCount="indefinite"
-             values="M0 0 L10 0 L10 10 Z;M0 0 L90 0 L90 90 Z"/>
-  </path>
+  <rect width="10" height="10" fill="#f00">
+    <animate attributeName="x" dur="1s" repeatCount="indefinite" values="20;20"/>
+  </rect>
 </svg>''');
 
       expect(kinds(found), contains(SvgAnimateDiagnosticKind.neverChanges));
-      expect(found.last.message, contains('"d"'));
+      expect(found.last.message, contains('"x"'));
     });
 
     test('does not claim the values changed when they never did', () async {
@@ -312,9 +311,9 @@ void main() {
       expect(still.message, contains('0 L'), reason: 'the way round it, not just the name');
     });
 
-    test('says an animated d never reaches the frames at all', () async {
-      // A different failure from the dash offset, and worth telling apart: this
-      // one never gets written, rather than being written and then dropped.
+    test('says nothing about an animated d, which now morphs', () async {
+      // Path data used to be held as one keyword and switched only at the very
+      // end of each step, so a looping morph never left its first shape.
       final List<SvgAnimateDiagnostic> found = await diagnose('''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <path d="M0 0 L10 0 L10 10 Z" fill="#f00">
@@ -323,11 +322,7 @@ void main() {
   </path>
 </svg>''');
 
-      final SvgAnimateDiagnostic still = found.firstWhere(
-        (SvgAnimateDiagnostic d) => d.kind == SvgAnimateDiagnosticKind.neverChanges,
-      );
-      expect(still.message, contains('"d"'));
-      expect(still.message, contains('authored'));
+      expect(kinds(found), isNot(contains(SvgAnimateDiagnosticKind.neverChanges)));
     });
 
     test('reports a clip over text, which will not reach it', () async {

@@ -264,9 +264,7 @@ int _sharedPrefixLength(List<Uint8List> frames) {
 /// cannot express" sends somebody back to read the whole file; "stroke-dashoffset"
 /// sends them to the one line that is wrong.
 ///
-/// The two that are known are known to fail in different places, and saying
-/// which saves the search: a `d` never reaches the markup, because path data is
-/// not a value this package interpolates, while a dash offset reaches it
+/// The one that is known is named exactly: a dash offset reaches the markup
 /// correctly and is dropped by the renderer underneath.
 SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
   final buffer = StringBuffer(
@@ -285,16 +283,10 @@ SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
       'length of the path, is the same effect and does compile.',
     );
   }
-  if (animated.contains('d')) {
-    buffer.write(
-      ' Path data is not a value this package interpolates, so an animated "d" never '
-      'reaches the frames at all: the element keeps the "d" it was authored with.',
-    );
-  }
-  if (!animated.contains('stroke-dashoffset') && !animated.contains('d')) {
-    // Only when neither of the two known causes applies. Where one does, it is
-    // named exactly, and offering a list of maybes after that would be worse
-    // than saying nothing.
+  if (!animated.contains('stroke-dashoffset')) {
+    // Only when the known cause does not apply. Where it does, it is named
+    // exactly, and offering a list of maybes after that would be worse than
+    // saying nothing.
     buffer.write(
       ' Either the values reach the frames and the renderer draws the same thing '
       'from them, or they never reach the frames at all — an animation told to '

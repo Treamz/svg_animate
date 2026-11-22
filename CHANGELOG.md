@@ -1,3 +1,22 @@
+## Unreleased
+
+* Morphs `d`. Path data was held as a single keyword, so an animated `d` kept
+  its first shape until the very end of each step and a looping morph never
+  left it, which reported `neverChanges`. Two paths with the same commands now
+  blend number by number, whether each is written absolute or relative, and an
+  arc's flags switch halfway, as SVG 2 defines and Chrome draws. Paths whose
+  commands differ switch halfway through the step. line-md grows bars and
+  opens shapes this way in 428 of its icons. Against Chrome at six frame times
+  of 372 of them, frames that match went from 187 to 295 of 2232 on their own,
+  and from 806 to 1017 together with the dash offset change. Most of what still
+  differs in those icons is opacity inside a `<mask>`, which the compiler
+  draws opaque.
+
+* Switches a value that cannot be interpolated halfway through each step,
+  instead of at its end. SVG and CSS both put the switch there, and Chrome
+  draws it there: `visibility` animated from `hidden` to `visible` over a
+  second now shows at half a second, not at the end.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
