@@ -11,6 +11,7 @@ import 'expand_use.dart';
 import 'offset_path.dart';
 import 'parsed_animation.dart';
 import 'smil_parser.dart';
+import 'timing.dart' show runBeginAt;
 import 'values.dart';
 
 /// A `<rect>` whose corner radius has to be kept within the size it is drawn at.
@@ -316,10 +317,27 @@ class _AnimationTarget {
 
   late final AnimatableValue? baseParsed;
 
+  /// The animations on this attribute, lowest priority first.
+  ///
+  /// Document order, which is SMIL's order for animations that begin together,
+  /// unless one of them runs more than once: then whichever run began last
+  /// wins, as SMIL has it. Only then, so that documents whose animations each
+  /// run once are combined exactly as they always have been.
+  Iterable<SvgAttributeAnimation> _inPriorityOrder(Duration time) {
+    if (animations.length < 2 || !animations.any((a) => a.timing.runs != null)) {
+      return animations;
+    }
+    final keyed = <(Duration, int, SvgAttributeAnimation)>[
+      for (var i = 0; i < animations.length; i++)
+        (runBeginAt(animations[i].timing, time) ?? _beforeEverything, i, animations[i]),
+    ]..sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2.compareTo(b.$2));
+    return keyed.map((e) => e.$3);
+  }
+
   void applyAt(Duration time) {
     AnimatableValue? current = baseParsed;
     var wroteAnything = false;
-    for (final SvgAttributeAnimation animation in animations) {
+    for (final SvgAttributeAnimation animation in _inPriorityOrder(time)) {
       final AnimatableValue? value = animation.valueAt(time);
       if (value == null) {
         continue;
@@ -473,6 +491,8 @@ bool _canWriteAsAttribute(String property, String value) {
       !value.contains('var(');
 }
 
+const Duration _beforeEverything = Duration(days: -365);
+
 class _DocumentTiming {
   const _DocumentTiming(this.duration, this.loops);
 
@@ -502,8 +522,11 @@ _DocumentTiming _documentTiming(List<_AnimationTarget> targets) {
         continue;
       }
       hasIndefinite = true;
-      if (simpleDuration > Duration.zero) {
-        loopMicroseconds = _leastCommonMultiple(loopMicroseconds, simpleDuration.inMicroseconds);
+      // An animation restarted by others on a cycle repeats on that cycle,
+      // whatever its own duration.
+      final Duration loop = animation.timing.period ?? simpleDuration;
+      if (loop > Duration.zero) {
+        loopMicroseconds = _leastCommonMultiple(loopMicroseconds, loop.inMicroseconds);
       }
     }
   }
