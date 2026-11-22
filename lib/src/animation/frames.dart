@@ -261,11 +261,8 @@ int _sharedPrefixLength(List<Uint8List> frames) {
 /// What was animated, when animating it changed nothing about the drawing.
 ///
 /// Naming the attributes is most of the value here. "Something the renderer
-/// cannot express" sends somebody back to read the whole file; "stroke-dashoffset"
-/// sends them to the one line that is wrong.
-///
-/// The one that is known is named exactly: a dash offset reaches the markup
-/// correctly and is dropped by the renderer underneath.
+/// cannot express" sends somebody back to read the whole file; an attribute
+/// name sends them to the one line that is wrong.
 SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
   final buffer = StringBuffer(
     'This SVG declares an animation, and every frame it was sampled at drew exactly '
@@ -275,25 +272,12 @@ SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
     final List<String> names = animated.toList()..sort();
     buffer.write(' What it animates: ${names.map((String name) => '"$name"').join(', ')}.');
   }
-  if (animated.contains('stroke-dashoffset')) {
-    buffer.write(
-      ' The dash offset is written into every frame correctly and then dropped: '
-      'vector_graphics carries no dash offset. To draw a path on, animate '
-      '"stroke-dasharray" instead — growing it from "0 L" to "L 0", where L is the '
-      'length of the path, is the same effect and does compile.',
-    );
-  }
-  if (!animated.contains('stroke-dashoffset')) {
-    // Only when the known cause does not apply. Where it does, it is named
-    // exactly, and offering a list of maybes after that would be worse than
-    // saying nothing.
-    buffer.write(
-      ' Either the values reach the frames and the renderer draws the same thing '
-      'from them, or they never reach the frames at all — an animation told to '
-      'begin after it ends never runs, and one given a single value has nothing '
-      'to travel towards.',
-    );
-  }
+  buffer.write(
+    ' Either the values reach the frames and the renderer draws the same thing '
+    'from them, or they never reach the frames at all — an animation told to '
+    'begin after it ends never runs, and one given a single value has nothing '
+    'to travel towards.',
+  );
   return SvgAnimateDiagnostic(SvgAnimateDiagnosticKind.neverChanges, buffer.toString());
 }
 

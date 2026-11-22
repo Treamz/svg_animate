@@ -1,3 +1,6 @@
+// Deprecated from Flutter 3.50 in favour of package:material_ui, which does not
+// exist on the oldest Flutter this package supports (3.38).
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:svg_animate/svg_animate.dart';
 
