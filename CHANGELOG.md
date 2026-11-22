@@ -1,5 +1,19 @@
 ## Unreleased
 
+* Stops reporting filters that are drawn. `vector_graphics_compiler` 1.3.6,
+  which needs Flutter 3.41, draws `feGaussianBlur`, `feOffset` and `feMerge`,
+  and an app on a current Flutter resolves it — but `droppedFilter` went on
+  saying that no filter is drawn, so a blur plainly on the screen was reported
+  as missing, and the README said the same. Whether a filter is drawn is now
+  asked of the compiler the app actually resolved, one kind of primitive at a
+  time: two encodes of a sixteen-pixel picture per kind, about 0.2 ms in a debug
+  build. A filter it draws is not reported. One it leaves out is reported with
+  the primitives that cause it, such as the `feFlood` and `feColorMatrix` in the
+  drop shadows design tools export, since the compiler leaves out the whole of a
+  filter when it does not draw every primitive in it. On a Flutter older than
+  3.41 the message also says what upgrading would draw.
+* The example's sample of a filter that is left out is a coloured glow now,
+  since the plain blur it used to be is drawn.
 * Plays animations that start one another. A `begin` naming the begin or the
   end of another animation, such as `begin="0;dot3.end+0.25s"`, was read as its
   first time and the rest dropped, and an animation whose `begin` held only such

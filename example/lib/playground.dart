@@ -58,11 +58,18 @@ const String _exampleUrl =
 /// with no diagnostics at all, and this one exists to produce one. A visitor
 /// with nothing of their own to try can still see what the package says when
 /// a file asks for more than the renderer can give.
+///
+/// A coloured glow rather than a plain blur: the renderer has drawn plain blurs
+/// since vector_graphics_compiler 1.3.6, and leaves out any filter with a
+/// flood in it.
 const String filterExample = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
   <defs>
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="4"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+      <feFlood flood-color="#90caf9"/>
+      <feComposite in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
   <circle cx="60" cy="60" r="26" fill="#42a5f5" filter="url(#glow)">
@@ -210,7 +217,7 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
     await _show(SvgAnimateNetworkLoader(url), url);
   }
 
-  /// Loads the bundled SVG that asks for a blur.
+  /// Loads the bundled SVG that asks for a coloured glow.
   ///
   /// Into the text field as well as into the picture, so that what produced the
   /// diagnostic can be read and edited rather than only described.
@@ -221,7 +228,7 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
     });
     await _show(
       const SvgAnimateStringLoader(filterExample),
-      'an SVG asking for a blur',
+      'an SVG asking for a coloured glow',
     );
   }
 
@@ -411,7 +418,7 @@ class _ExampleHint extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         Text(
-          'Nothing to hand? Try one that asks for a blur, which cannot be drawn:',
+          'Nothing to hand? Try one that asks for a coloured glow, which the renderer leaves out:',
           style: theme.textTheme.bodySmall,
         ),
         TextButton(onPressed: onPressed, child: const Text('load it')),
