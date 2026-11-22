@@ -6,6 +6,7 @@ import 'package:xml/xml.dart';
 import 'animation.dart';
 import 'motion_path.dart';
 import 'parsed_animation.dart';
+import 'smil_schedule.dart';
 import 'timing.dart';
 import 'values.dart';
 
@@ -48,10 +49,23 @@ List<ParsedAnimation> parseSmilAnimations(
   required String? Function(XmlElement element, String attributeName) baseValueOf,
 }) {
   final animations = <ParsedAnimation>[];
-  for (final XmlElement element in document.descendantElements) {
-    if (!smilAnimationElements.contains(element.name.local)) {
-      continue;
-    }
+  final List<XmlElement> elements = <XmlElement>[
+    for (final XmlElement element in document.descendantElements)
+      if (smilAnimationElements.contains(element.name.local)) element,
+  ];
+  // Worked out for all of them at once, because a `begin` can name the begin
+  // or the end of any other animation in the document.
+  final Map<XmlElement, SmilSchedule> schedules = scheduleSmilAnimations(<SmilScheduleEntry>[
+    for (final XmlElement element in elements)
+      SmilScheduleEntry(
+        element: element,
+        id: element.getAttribute('id'),
+        begin: attributeByLocalName(element, 'begin'),
+        activeDuration: _parseDurations(element, isSet: element.name.local == 'set').activeFrom,
+        restart: attributeByLocalName(element, 'restart')?.trim() ?? 'always',
+      ),
+  ]);
+  for (final XmlElement element in elements) {
     final XmlElement? target = _resolveTarget(element, elementsById);
     if (target == null) {
       continue;
@@ -61,6 +75,7 @@ List<ParsedAnimation> parseSmilAnimations(
       target,
       elementsById,
       baseValueOf,
+      schedules[element],
     );
     if (animation != null) {
       animations.add(ParsedAnimation(target, animation));
@@ -83,6 +98,7 @@ SvgAttributeAnimation? _parseAnimationElement(
   XmlElement target,
   Map<String, XmlElement> elementsById,
   String? Function(XmlElement element, String attributeName) baseValueOf,
+  SmilSchedule? schedule,
 ) {
   final String elementName = element.name.local;
   final isMotion = elementName == 'animateMotion';
@@ -94,7 +110,11 @@ SvgAttributeAnimation? _parseAnimationElement(
     return null;
   }
 
-  final SvgAnimationTiming? timing = _parseTiming(element, isSet: elementName == 'set');
+  final SvgAnimationTiming? timing = _parseTiming(
+    element,
+    isSet: elementName == 'set',
+    schedule: schedule,
+  );
   if (timing == null) {
     return null;
   }
@@ -220,25 +240,34 @@ SvgAttributeAnimation? _parseMotion(
   );
 }
 
-SvgAnimationTiming? _parseTiming(XmlElement element, {required bool isSet}) {
-  Duration begin = Duration.zero;
-  final String? rawBegin = attributeByLocalName(element, 'begin');
-  if (rawBegin != null && rawBegin.trim().isNotEmpty) {
-    Duration? parsed;
-    for (final String token in rawBegin.split(';')) {
-      parsed = parseClockValue(token);
-      if (parsed != null) {
-        break;
-      }
-    }
-    if (parsed == null) {
-      // The animation is triggered by an event or is explicitly indefinite, so
-      // it never runs in a non-interactive rendering.
-      return null;
-    }
-    begin = parsed;
-  }
+/// How long an animation element runs, apart from when it begins.
+class _Durations {
+  const _Durations(this.simpleDuration, this.repeatCount, this.end);
 
+  final Duration? simpleDuration;
+
+  /// Null when it repeats indefinitely.
+  final double? repeatCount;
+
+  /// An `end` given as a clock value, measured from the start of the document.
+  final Duration? end;
+
+  /// How long a run beginning at [begin] lasts, or null if it never stops by
+  /// itself.
+  Duration? activeFrom(Duration begin) {
+    final Duration? fromRepeats = switch ((simpleDuration, repeatCount)) {
+      (final Duration duration, final double count) => duration * count,
+      _ => null,
+    };
+    final Duration? fromEnd = end != null && end! > begin ? end! - begin : null;
+    if (fromRepeats == null || fromEnd == null) {
+      return fromRepeats ?? fromEnd;
+    }
+    return fromRepeats < fromEnd ? fromRepeats : fromEnd;
+  }
+}
+
+_Durations _parseDurations(XmlElement element, {required bool isSet}) {
   final String? rawDuration = attributeByLocalName(element, 'dur');
   final Duration? simpleDuration = rawDuration == null ? null : parseClockValue(rawDuration);
 
@@ -268,16 +297,55 @@ SvgAnimationTiming? _parseTiming(XmlElement element, {required bool isSet}) {
   // unless the element says otherwise.
   final bool defaultsToIndefinite = isSet && rawDuration == null;
 
-  return SvgAnimationTiming(
-    begin: begin,
-    simpleDuration: simpleDuration,
-    repeatCount: repeatsIndefinitely && repeatCount == null
+  return _Durations(
+    simpleDuration,
+    repeatsIndefinitely && repeatCount == null
         ? null
         : repeatCount ?? (defaultsToIndefinite ? null : 1.0),
-    end: end,
-    fill: attributeByLocalName(element, 'fill')?.trim() == 'freeze'
-        ? SvgFillMode.freeze
-        : SvgFillMode.remove,
+    end,
+  );
+}
+
+SvgAnimationTiming? _parseTiming(
+  XmlElement element, {
+  required bool isSet,
+  SmilSchedule? schedule,
+}) {
+  final _Durations durations = _parseDurations(element, isSet: isSet);
+  final SvgFillMode fill = attributeByLocalName(element, 'fill')?.trim() == 'freeze'
+      ? SvgFillMode.freeze
+      : SvgFillMode.remove;
+
+  if (schedule != null) {
+    // A begin list with more than one time, or with the begin or end of
+    // another animation in it, resolved for the whole document beforehand.
+    if (schedule.intervals.isEmpty) {
+      return null;
+    }
+    return SvgAnimationTiming(
+      begin: schedule.intervals.first.begin,
+      simpleDuration: durations.simpleDuration,
+      repeatCount: durations.repeatCount,
+      end: durations.end,
+      fill: fill,
+      runs: schedule.intervals,
+      period: schedule.period,
+    );
+  }
+
+  final Duration? begin = singleBeginTime(attributeByLocalName(element, 'begin'));
+  if (begin == null) {
+    // The animation is triggered by an event or is explicitly indefinite, so
+    // it never runs in a non-interactive rendering.
+    return null;
+  }
+
+  return SvgAnimationTiming(
+    begin: begin,
+    simpleDuration: durations.simpleDuration,
+    repeatCount: durations.repeatCount,
+    end: durations.end,
+    fill: fill,
   );
 }
 
@@ -424,8 +492,8 @@ AnimatableValue? parseAnimationValue(String attributeName, String raw, {String? 
 /// finding nothing to start from, the animation was dropped and the circle never
 /// appeared. Chrome starts these from the values here.
 ///
-/// Inherited properties are not listed: what they start from is whatever the
-/// nearest ancestor sets, which is not known here.
+/// Inherited properties are not listed: they start from whatever the nearest
+/// ancestor sets, which `baseValueOf` already looks up.
 const Map<String, String> _initialValues = <String, String>{
   'x': '0',
   'y': '0',

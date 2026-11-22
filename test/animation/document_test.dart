@@ -70,6 +70,19 @@ void main() {
       expect(attributeAt(document, const Duration(milliseconds: 500), 'c', 'r'), '3');
     });
 
+    test('without from starts an inherited property from the parent that sets it', () {
+      // The path has no stroke-width of its own; the group's is what it draws
+      // with, so that is where a "to" animation starts.
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+<g stroke-width="2"><path id="p" d="M0 0 H10" stroke="#000">
+  <animate attributeName="stroke-width" to="6" dur="1s"/>
+</path></g>'''),
+      );
+
+      expect(attributeAt(document, const Duration(milliseconds: 500), 'p', 'stroke-width'), '4');
+    });
+
     test('interpolates between from and to', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''
