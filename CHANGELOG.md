@@ -36,6 +36,18 @@
   written onto such a shape in each frame. Against Chrome at six frame times of
   every line-md icon with an offset, frames that match went from 6383 to 6721
   of 7002 together with the dash offset, `d` and mask changes; none got worse.
+* Starts a `to` animation of an attribute the element does not set from that
+  attribute's initial value. With nothing to start from, the animation was
+  dropped: a `<circle>` with no `r` grown in by `<animate attributeName="r"
+  to="4"/>`, which is how line-md draws dots and pupils, never appeared. The
+  geometry attributes now start from 0 and the opacities from 1, as Chrome
+  draws them. Inherited properties still start from the nearest ancestor that
+  sets them. 93 line-md icons change, `discord` among them, which drew one
+  still frame before. Against Chrome, together with the dash offset, `d`, mask
+  and inherited stroke changes, the 905 line-md icons whose length this leaves
+  alone match at 5385 of 5430 frames where they matched at 5199, and the 262
+  that now run longer, because their last parts finally play, match at all
+  1572 of their frames.
 
 ## 0.7.0
 
