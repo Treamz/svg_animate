@@ -1,3 +1,21 @@
+## Unreleased
+
+* Does not run an animation whose `keyTimes` do not fit its values: not one
+  per value, not starting at 0, going backwards, outside 0 to 1, or, for
+  values that blend, not ending at 1. SMIL puts such an animation in error and
+  Chrome does not run it. These `keyTimes` were replaced with evenly spaced
+  ones and the animation played motion the file never had: the needle of
+  line-md's compass icons, whose `keyTimes` go back from 0.8 to 0.3, turned
+  where Chrome holds it still.
+
+* Reads `transform-origin` written as an attribute, as SVG 2 allows and
+  Chrome draws it. Only the CSS property was read, so an element with
+  `transform-origin="0.74px 14.15px"` scaled about the corner of the picture;
+  line-md's soundcloud bars grew from the top of the icon instead of from
+  their middle. Together with the other open changes, line-md now matches
+  Chrome at 5415 of 5430 frames of the icons whose length does not change,
+  where it matched at 5385.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
