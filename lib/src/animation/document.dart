@@ -143,15 +143,20 @@ class AnimatedSvgDocument {
         continue;
       }
       final Map<String, String> declarations = _flattenStyle(element, stylesheet);
-      if (declarations.isEmpty) {
-        continue;
-      }
-      final String? rawOrigin = declarations['transform-origin'];
-      if (rawOrigin != null && declarations['transform-box'] != 'fill-box') {
+      // SVG 2 makes transform-origin a presentation attribute as well, and
+      // icon sets write it that way; Chrome honours it.
+      final String? rawOrigin =
+          declarations['transform-origin'] ?? element.getAttribute('transform-origin');
+      final String? transformBox =
+          declarations['transform-box'] ?? element.getAttribute('transform-box');
+      if (rawOrigin != null && transformBox?.trim() != 'fill-box') {
         final (double, double)? origin = _parseTransformOrigin(rawOrigin, viewBox);
         if (origin != null) {
           origins[element] = origin;
         }
+      }
+      if (declarations.isEmpty) {
+        continue;
       }
       final OffsetPath? offsetPath = OffsetPath.parse(declarations);
       var movesAlongPath = false;

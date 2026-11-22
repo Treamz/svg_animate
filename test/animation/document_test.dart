@@ -45,6 +45,37 @@ void main() {
   });
 
   group('<animate>', () {
+    test('with keyTimes that do not fit its values does not run, as in Chrome', () {
+      // Out of order, too few, not starting at 0, and blending values that do
+      // not end at 1: SMIL puts each animation in error, and Chrome leaves x
+      // at 5 for all four.
+      final document = AnimatedSvgDocument.parse(
+        svgWith(
+          '''
+<rect id="a" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.8;0.3" dur="1s"/></rect>
+<rect id="b" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.5" dur="1s"/></rect>
+<rect id="c" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0.1;0.5;1" dur="1s"/></rect>
+<rect id="d" x="5" width="10" height="10"><animate attributeName="x" values="0;10;20" keyTimes="0;0.5;0.9" dur="1s"/></rect>''',
+        ),
+      );
+      const time = Duration(milliseconds: 600);
+
+      for (final String id in <String>['a', 'b', 'c', 'd']) {
+        expect(attributeAt(document, time, id, 'x'), '5', reason: id);
+      }
+    });
+
+    test('with discrete keyTimes that stop short of 1 still runs', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+<rect id="r" x="5" width="10" height="10">
+  <animate attributeName="x" values="0;10" keyTimes="0;0.5" calcMode="discrete" dur="1s"/>
+</rect>'''),
+      );
+
+      expect(attributeAt(document, const Duration(milliseconds: 600), 'r', 'x'), '10');
+    });
+
     test('without from starts an attribute the element does not set at its initial value', () {
       // What Chrome draws for each: r, width and x start at 0, opacity at 1.
       final document = AnimatedSvgDocument.parse(
@@ -235,6 +266,29 @@ void main() {
   });
 
   group('<animateTransform>', () {
+    test('turns about a transform-origin written as an attribute', () {
+      // Chrome scales both rects about their middle, 15 15, with or without px.
+      final document = AnimatedSvgDocument.parse(
+        svgWith(
+          '''
+<rect id="t" x="10" y="10" width="10" height="10" transform-origin="15px 15px">
+  <animateTransform attributeName="transform" type="scale" values="2" dur="1s"/>
+</rect>
+<rect id="u" x="10" y="10" width="10" height="10" transform-origin="15 15" transform="scale(2)"/>''',
+        ),
+      );
+      const time = Duration(milliseconds: 500);
+
+      expect(
+        attributeAt(document, time, 't', 'transform'),
+        'translate(15 15) scale(2) translate(-15 -15)',
+      );
+      expect(
+        attributeAt(document, time, 'u', 'transform'),
+        'translate(15 15) scale(2) translate(-15 -15)',
+      );
+    });
+
     test('animates a rotation about a point', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''
