@@ -45,6 +45,31 @@ void main() {
   });
 
   group('<animate>', () {
+    test('without from starts an attribute the element does not set at its initial value', () {
+      // What Chrome draws for each: r, width and x start at 0, opacity at 1.
+      final document = AnimatedSvgDocument.parse(
+        svgWith('''
+<circle id="c" cx="50" cy="50"><animate attributeName="r" to="4" dur="1s"/></circle>
+<rect id="w" height="10"><animate attributeName="width" to="20" dur="1s"/></rect>
+<rect id="x" width="10" height="10"><animate attributeName="x" to="20" dur="1s"/></rect>
+<rect id="o" width="10" height="10"><animate attributeName="opacity" to="0" dur="1s"/></rect>'''),
+      );
+      const half = Duration(milliseconds: 500);
+
+      expect(attributeAt(document, half, 'c', 'r'), '2');
+      expect(attributeAt(document, half, 'w', 'width'), '10');
+      expect(attributeAt(document, half, 'x', 'x'), '10');
+      expect(attributeAt(document, half, 'o', 'opacity'), '0.5');
+    });
+
+    test('without from still starts from the attribute when the element sets it', () {
+      final document = AnimatedSvgDocument.parse(
+        svgWith('<circle id="c" r="2"><animate attributeName="r" to="4" dur="1s"/></circle>'),
+      );
+
+      expect(attributeAt(document, const Duration(milliseconds: 500), 'c', 'r'), '3');
+    });
+
     test('interpolates between from and to', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''

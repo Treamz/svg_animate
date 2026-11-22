@@ -1,3 +1,18 @@
+## Unreleased
+
+* Starts a `to` animation of an attribute the element does not set from that
+  attribute's initial value. With nothing to start from, the animation was
+  dropped: a `<circle>` with no `r` grown in by `<animate attributeName="r"
+  to="4"/>`, which is how line-md draws dots and pupils, never appeared. The
+  geometry attributes now start from 0 and the opacities from 1, as Chrome
+  draws them. Inherited properties still start from the nearest ancestor that
+  sets them. 93 line-md icons change, `discord` among them, which drew one
+  still frame before. Against Chrome, together with the dash offset, `d`, mask
+  and inherited stroke changes, the 905 line-md icons whose length this leaves
+  alone match at 5385 of 5430 frames where they matched at 5199, and the 262
+  that now run longer, because their last parts finally play, match at all
+  1572 of their frames.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared
