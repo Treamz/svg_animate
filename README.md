@@ -184,7 +184,7 @@ what a still one does through `flutter_svg`: paths and shapes, linear and radial
 gradients, patterns, `clipPath`, `mask`, text, embedded raster images, and the
 fifteen CSS blend modes.
 
-Two things that a still SVG does *not* get are handled here, because the
+Three things that a still SVG does *not* get are handled here, because the
 renderer cannot do them on its own:
 
 - **CSS in a `<style>` element** is resolved into presentation attributes. The
@@ -194,6 +194,13 @@ renderer cannot do them on its own:
 - **A `<use>` pointing at an `<image>`** is expanded into the image. The
   renderer loses an image's size through a reference and then fails the whole
   picture rather than that one element.
+- **`stroke-dashoffset` and `pathLength`** are laid out here. The compiler
+  reads neither, so the usual way of drawing a path on, a dash as long as the
+  path slid along it by animating the offset, compiled to a picture that never
+  moved. The dashes are cut with the compiler's own dasher, starting again at
+  each subpath as browsers do, and written into each frame as plain path data.
+  A dash array on its own goes the same way, which puts dots along a curve
+  where browsers put them.
 
 ### What is not supported
 
@@ -203,7 +210,6 @@ renderer cannot do them on its own:
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
 | Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
 | `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
-| Animating `stroke-dashoffset` | `vector_graphics` carries no dash offset, so the value changes and the drawing does not. To draw a path on, animate `stroke-dasharray` instead: growing it from `0 L` to `L 0`, where `L` is the length of the path, is the same effect and does compile. The example's "Drawn on" sample does it that way |
 | `begin` on an event, `indefinite`, or another animation's repeat | there is no interactive document to fire it. A list that also holds a time, or the begin or end of another animation, keeps those |
 | CSS pseudo-classes such as `:hover` | same |
 | CSS custom properties and `var()` | left alone, so the element keeps the presentation attribute it already had |
@@ -227,7 +233,7 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | kind | what it means |
 |---|---|
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
-| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and for the two known cases says which layer dropped them: an animated `d` never reaches the frames, while a `stroke-dashoffset` reaches them and is dropped by the renderer |
+| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and says when the cause is the known one: an animated `d` never reaches the frames |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
 | `droppedFilter` | a `<filter>` is used that the renderer leaves out. Which filters those are depends on the version of `vector_graphics` the app resolves, so the compiler in use is asked rather than a list consulted: a filter it draws is not reported. The message names the primitives it does not draw. On a Flutter older than 3.41 it also says what upgrading would draw, and if the whole of a filter is one `feGaussianBlur`, it carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |

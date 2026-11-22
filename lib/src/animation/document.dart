@@ -5,6 +5,7 @@ import 'package:xml/xml.dart';
 import 'animation.dart';
 import 'css.dart';
 import 'css_animations.dart';
+import 'dashes.dart';
 import 'diagnostics.dart';
 import 'expand_use.dart';
 import 'offset_path.dart';
@@ -109,6 +110,7 @@ class AnimatedSvgDocument {
     this._document,
     this._targets,
     this._roundedRects,
+    this._dashedStrokes,
     this.duration,
     this.loops,
   );
@@ -176,12 +178,7 @@ class AnimatedSvgDocument {
     }
 
     animations.addAll(
-      parseSmilAnimations(
-        document,
-        elementsById: elementsById,
-        baseValueOf: (XmlElement element, String attributeName) =>
-            element.getAttribute(attributeName),
-      ),
+      parseSmilAnimations(document, elementsById: elementsById, baseValueOf: _underlyingValue),
     );
     for (final XmlElement element in document.descendantElements.toList()) {
       if (smilAnimationElements.contains(element.name.local)) {
@@ -233,13 +230,28 @@ class AnimatedSvgDocument {
       }
     }
 
+    final dashedStrokes = DashedStrokes.find(document, <XmlElement>{
+      for (final _AnimationTarget target in targets)
+        if (target.attributeName == 'stroke-dashoffset' ||
+            target.attributeName == 'stroke-dasharray')
+          target.element,
+    });
+
     final _DocumentTiming timing = _documentTiming(targets);
-    return AnimatedSvgDocument._(document, targets, roundedRects, timing.duration, timing.loops);
+    return AnimatedSvgDocument._(
+      document,
+      targets,
+      roundedRects,
+      dashedStrokes,
+      timing.duration,
+      timing.loops,
+    );
   }
 
   final XmlDocument _document;
   final List<_AnimationTarget> _targets;
   final List<_RoundedRect> _roundedRects;
+  final DashedStrokes _dashedStrokes;
 
   /// What this document contains that will not survive being compiled.
   ///
@@ -280,7 +292,13 @@ class AnimatedSvgDocument {
     for (final _RoundedRect rect in _roundedRects) {
       rect.clamp();
     }
-    return _document.toXmlString();
+    if (_dashedStrokes.isEmpty) {
+      return _document.toXmlString();
+    }
+    final void Function() restore = _dashedStrokes.apply();
+    final String markup = _document.toXmlString();
+    restore();
+    return markup;
   }
 }
 
@@ -350,6 +368,45 @@ class _AnimationTarget {
 
   String _withOrigin(String transform) =>
       attributeName == 'transform' && origin != null ? _aboutOrigin(transform, origin!) : transform;
+}
+
+/// The presentation properties an element takes from its parent when it does
+/// not set them itself.
+const Set<String> _inheritedProperties = <String>{
+  'color',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-opacity',
+  'stroke-width',
+  'visibility',
+};
+
+/// The value an animation without a `from` starts from: the element's own, or
+/// for an inherited property, the one it takes from the nearest ancestor that
+/// sets it.
+///
+/// Icon sets set `stroke-dashoffset` once on a group and animate each path in
+/// it `to="0"`. Reading only the path's own attribute found nothing there, so
+/// the animation was dropped and the path stayed where the group put it.
+String? _underlyingValue(XmlElement element, String attributeName) {
+  final String? own = element.getAttribute(attributeName);
+  if (own != null || !_inheritedProperties.contains(attributeName)) {
+    return own;
+  }
+  for (XmlNode? node = element.parent; node is XmlElement; node = node.parent) {
+    final String? value = node.getAttribute(attributeName);
+    if (value != null && value.trim() != 'inherit') {
+      return value;
+    }
+  }
+  return null;
 }
 
 /// Rewrites [transform] so that it is applied about [origin] rather than the
