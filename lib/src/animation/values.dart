@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import '_named_colors.dart';
+import 'path_data.dart';
 
 /// The attributes whose values are parsed as colors rather than as numbers.
 ///
@@ -768,7 +769,8 @@ class TransformListValue extends AnimatableValue {
 /// `url(#gradient)` paint server reference.
 ///
 /// Keyword values still animate, but only discretely: the value switches to the
-/// next keyframe rather than blending into it.
+/// next keyframe halfway there rather than blending into it, which is where
+/// SVG and CSS both put the switch and where Chrome draws it.
 class KeywordValue extends AnimatableValue {
   /// Creates a keyword value that renders as [text].
   const KeywordValue(this.text);
@@ -780,7 +782,7 @@ class KeywordValue extends AnimatableValue {
   String toAttributeValue() => text;
 
   @override
-  AnimatableValue? lerp(AnimatableValue other, double t) => t < 1.0 ? this : other;
+  AnimatableValue? lerp(AnimatableValue other, double t) => t < 0.5 ? this : other;
 
   @override
   AnimatableValue? add(AnimatableValue other) => null;
@@ -805,6 +807,9 @@ class KeywordValue extends AnimatableValue {
 /// [KeywordValue], which animates discretely.
 AnimatableValue parseAnimatableValue(String attributeName, String raw) {
   final String value = raw.trim();
+  if (attributeName == 'd') {
+    return PathDataValue.parse(value) ?? KeywordValue(value);
+  }
   if (_colorAttributes.contains(attributeName)) {
     final ColorValue? color = ColorValue.parse(value);
     if (color != null) {

@@ -261,11 +261,8 @@ int _sharedPrefixLength(List<Uint8List> frames) {
 /// What was animated, when animating it changed nothing about the drawing.
 ///
 /// Naming the attributes is most of the value here. "Something the renderer
-/// cannot express" sends somebody back to read the whole file; `d` sends them
-/// to the one line that is wrong.
-///
-/// The one cause that is known is named exactly: a `d` never reaches the
-/// markup, because path data is not a value this package interpolates.
+/// cannot express" sends somebody back to read the whole file; an attribute
+/// name sends them to the one line that is wrong.
 SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
   final buffer = StringBuffer(
     'This SVG declares an animation, and every frame it was sampled at drew exactly '
@@ -275,23 +272,12 @@ SvgAnimateDiagnostic _neverChangesDiagnostic(Set<String> animated) {
     final List<String> names = animated.toList()..sort();
     buffer.write(' What it animates: ${names.map((String name) => '"$name"').join(', ')}.');
   }
-  if (animated.contains('d')) {
-    buffer.write(
-      ' Path data is not a value this package interpolates, so an animated "d" never '
-      'reaches the frames at all: the element keeps the "d" it was authored with.',
-    );
-  }
-  if (!animated.contains('d')) {
-    // Only when the known cause does not apply. Where it does, it is named
-    // exactly, and offering a list of maybes after that would be worse than
-    // saying nothing.
-    buffer.write(
-      ' Either the values reach the frames and the renderer draws the same thing '
-      'from them, or they never reach the frames at all — an animation told to '
-      'begin after it ends never runs, and one given a single value has nothing '
-      'to travel towards.',
-    );
-  }
+  buffer.write(
+    ' Either the values reach the frames and the renderer draws the same thing '
+    'from them, or they never reach the frames at all — an animation told to '
+    'begin after it ends never runs, and one given a single value has nothing '
+    'to travel towards.',
+  );
   return SvgAnimateDiagnostic(SvgAnimateDiagnosticKind.neverChanges, buffer.toString());
 }
 

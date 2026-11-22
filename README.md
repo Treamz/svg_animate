@@ -167,7 +167,8 @@ want.
 | `animation-fill-mode` | `forwards` and `both` hold the last frame |
 | CSS motion paths | `offset-path: path(...)`, `offset-distance`, `offset-rotate` |
 | `transform-origin` | resolved against the view box |
-| Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists |
+| Animated value types | numbers, lengths, percentages, colors (hex, `rgb()`, `hsl()`, SVG keywords), number lists, transform lists, path data (`d`) |
+| Path morphing | `d` blends between paths with the same commands, absolute or relative, as SVG 2 defines; paths whose commands differ switch halfway |
 
 Animations that start one another — `begin="dot3.end+0.25s"`, which is how
 most loaders in [svg-spinners](https://github.com/n3r4zzurr0/svg-spinners) are
@@ -208,7 +209,6 @@ renderer cannot do them on its own:
 |---|---|
 | `<filter>` beyond blur, offset and merge | `vector_graphics_compiler` 1.3.6 and later, which need Flutter 3.41, draw `feGaussianBlur`, `feOffset` and `feMerge` — so a soft shadow or a plain glow is drawn, and its `stdDeviation`, `dx` and `dy` animate — and leave out the whole of a filter that uses any other primitive, such as the `feFlood` and `feColorMatrix` in the drop shadows design tools export. On an earlier Flutter no filter is drawn; where the whole filter is one `feGaussianBlur`, the diagnostic below gives the `imageBuilder` that approximates it. Either way the element still draws, without the effect |
 | `mix-blend-mode: plus-lighter` | not among the fifteen modes the renderer knows; editors reach for it to make a glow |
-| Morphing the `d` attribute | path data is not a value this package interpolates, so the element keeps the `d` it was authored with and nothing switches |
 | `clip-path` over `<text>` | the clip does not reach the letters, which draw in full whatever it says. Clipping shapes works; this is the one thing it does not reach. Reported as `unclippedText` |
 | `begin` on an event, `indefinite`, or another animation's repeat | there is no interactive document to fire it. A list that also holds a time, or the begin or end of another animation, keeps those |
 | CSS pseudo-classes such as `:hover` | same |
@@ -233,7 +233,7 @@ for (final SvgAnimateDiagnostic diagnostic in frames.diagnostics) {
 | kind | what it means |
 |---|---|
 | `noAnimation` | nothing to play. If the file also has a `<script>`, it was exported for an editor's own JavaScript player and the markup holds only the first frame; re-export it as CSS or SMIL animation |
-| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates, and says when the cause is the known one: an animated `d` never reaches the frames |
+| `neverChanges` | an animation was declared, and every frame of it drew the same picture. The message names the attributes it animates |
 | `unreachableImage` | an `<image>` points somewhere other than a `data:` URI; the compiler fetches nothing, so the image is left out of every frame |
 | `droppedFilter` | a `<filter>` is used that the renderer leaves out. Which filters those are depends on the version of `vector_graphics` the app resolves, so the compiler in use is asked rather than a list consulted: a filter it draws is not reported. The message names the primitives it does not draw. On a Flutter older than 3.41 it also says what upgrading would draw, and if the whole of a filter is one `feGaussianBlur`, it carries the `ImageFiltered` that comes closest, with the file's own `stdDeviation` in it — that blurs the whole picture rather than the one element, and its sigma is in the SVG's units, so it wants scaling with the picture |
 | `reducedFrameRate` | the animation is longer than `maxFrames` allows at `frameRate`, so it was sampled over its whole length at a lower rate |
