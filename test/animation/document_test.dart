@@ -228,6 +228,29 @@ void main() {
   });
 
   group('<animateTransform>', () {
+    test('turns about a transform-origin written as an attribute', () {
+      // Chrome scales both rects about their middle, 15 15, with or without px.
+      final document = AnimatedSvgDocument.parse(
+        svgWith(
+          '''
+<rect id="t" x="10" y="10" width="10" height="10" transform-origin="15px 15px">
+  <animateTransform attributeName="transform" type="scale" values="2" dur="1s"/>
+</rect>
+<rect id="u" x="10" y="10" width="10" height="10" transform-origin="15 15" transform="scale(2)"/>''',
+        ),
+      );
+      const time = Duration(milliseconds: 500);
+
+      expect(
+        attributeAt(document, time, 't', 'transform'),
+        'translate(15 15) scale(2) translate(-15 -15)',
+      );
+      expect(
+        attributeAt(document, time, 'u', 'transform'),
+        'translate(15 15) scale(2) translate(-15 -15)',
+      );
+    });
+
     test('animates a rotation about a point', () {
       final document = AnimatedSvgDocument.parse(
         svgWith('''
