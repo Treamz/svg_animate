@@ -185,7 +185,7 @@ what a still one does through `flutter_svg`: paths and shapes, linear and radial
 gradients, patterns, `clipPath`, `mask`, text, embedded raster images, and the
 fifteen CSS blend modes.
 
-Four things that a still SVG does *not* get are handled here, because the
+Five things that a still SVG does *not* get are handled here, because the
 renderer cannot do them on its own:
 
 - **CSS in a `<style>` element** is resolved into presentation attributes. The
@@ -207,6 +207,11 @@ renderer cannot do them on its own:
   fade in a mask, and the soft edge of every shape in one, came out opaque.
   Each luminance mask is drawn over black here, which turns that alpha into
   luminance the renderer does read.
+- **A shape's own `opacity` over a stroke it inherits** is kept. The compiler
+  applies a shape's `opacity` to its stroke only when the shape names its own
+  stroke colour, so a path that takes its stroke from a group and is hidden
+  with `opacity="0"` drew in full. The inherited stroke is written onto the
+  shape, which the compiler then fades.
 
 ### What is not supported
 

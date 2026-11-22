@@ -7,6 +7,7 @@ import 'css.dart';
 import 'css_animations.dart';
 import 'dashes.dart';
 import 'diagnostics.dart';
+import 'element_opacity.dart';
 import 'expand_use.dart';
 import 'masks.dart';
 import 'offset_path.dart';
@@ -111,6 +112,7 @@ class AnimatedSvgDocument {
     this._document,
     this._targets,
     this._roundedRects,
+    this._inheritedStrokes,
     this._dashedStrokes,
     this.duration,
     this.loops,
@@ -232,6 +234,11 @@ class AnimatedSvgDocument {
       }
     }
 
+    final inheritedStrokes = InheritedStrokes.find(document, <XmlElement>{
+      for (final _AnimationTarget target in targets)
+        if (target.attributeName == 'opacity') target.element,
+    });
+
     final dashedStrokes = DashedStrokes.find(document, <XmlElement>{
       for (final _AnimationTarget target in targets)
         if (target.attributeName == 'stroke-dashoffset' ||
@@ -244,6 +251,7 @@ class AnimatedSvgDocument {
       document,
       targets,
       roundedRects,
+      inheritedStrokes,
       dashedStrokes,
       timing.duration,
       timing.loops,
@@ -253,6 +261,7 @@ class AnimatedSvgDocument {
   final XmlDocument _document;
   final List<_AnimationTarget> _targets;
   final List<_RoundedRect> _roundedRects;
+  final InheritedStrokes _inheritedStrokes;
   final DashedStrokes _dashedStrokes;
 
   /// What this document contains that will not survive being compiled.
@@ -294,12 +303,16 @@ class AnimatedSvgDocument {
     for (final _RoundedRect rect in _roundedRects) {
       rect.clamp();
     }
-    if (_dashedStrokes.isEmpty) {
+    if (_inheritedStrokes.isEmpty && _dashedStrokes.isEmpty) {
       return _document.toXmlString();
     }
-    final void Function() restore = _dashedStrokes.apply();
+    // Each pass edits the shared document for this one frame and is undone,
+    // the later one first.
+    final void Function() restoreStrokes = _inheritedStrokes.apply();
+    final void Function() restoreDashes = _dashedStrokes.apply();
     final String markup = _document.toXmlString();
-    restore();
+    restoreDashes();
+    restoreStrokes();
     return markup;
   }
 }
