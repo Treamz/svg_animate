@@ -1,3 +1,13 @@
+## Unreleased
+
+* Starts an animation with no `from` at the value an inherited property takes
+  from its parent. Only the element's own attribute was read, so a path
+  animated `to="0"` under a group that sets `stroke-dashoffset`, or a mask path
+  faded `to="1"` under a group that sets `fill-opacity`, found nothing to start
+  from and the animation was dropped without a word. Icon sets write it that
+  way: in line-md the fade in `map-marker-multiple-alt-filled` now plays, and
+  the document is 0.8 s long instead of 0.4 s, as in a browser.
+
 ## 0.6.3
 
 * Reads `offset-rotate` the way CSS defines it. Its keywords were compared

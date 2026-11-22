@@ -175,12 +175,7 @@ class AnimatedSvgDocument {
     }
 
     animations.addAll(
-      parseSmilAnimations(
-        document,
-        elementsById: elementsById,
-        baseValueOf: (XmlElement element, String attributeName) =>
-            element.getAttribute(attributeName),
-      ),
+      parseSmilAnimations(document, elementsById: elementsById, baseValueOf: _underlyingValue),
     );
     for (final XmlElement element in document.descendantElements.toList()) {
       if (smilAnimationElements.contains(element.name.local)) {
@@ -332,6 +327,45 @@ class _AnimationTarget {
 
   String _withOrigin(String transform) =>
       attributeName == 'transform' && origin != null ? _aboutOrigin(transform, origin!) : transform;
+}
+
+/// The presentation properties an element takes from its parent when it does
+/// not set them itself.
+const Set<String> _inheritedProperties = <String>{
+  'color',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-opacity',
+  'stroke-width',
+  'visibility',
+};
+
+/// The value an animation without a `from` starts from: the element's own, or
+/// for an inherited property, the one it takes from the nearest ancestor that
+/// sets it.
+///
+/// Icon sets set `stroke-dashoffset` once on a group and animate each path in
+/// it `to="0"`. Reading only the path's own attribute found nothing there, so
+/// the animation was dropped and the path stayed where the group put it.
+String? _underlyingValue(XmlElement element, String attributeName) {
+  final String? own = element.getAttribute(attributeName);
+  if (own != null || !_inheritedProperties.contains(attributeName)) {
+    return own;
+  }
+  for (XmlNode? node = element.parent; node is XmlElement; node = node.parent) {
+    final String? value = node.getAttribute(attributeName);
+    if (value != null && value.trim() != 'inherit') {
+      return value;
+    }
+  }
+  return null;
 }
 
 /// Rewrites [transform] so that it is applied about [origin] rather than the
