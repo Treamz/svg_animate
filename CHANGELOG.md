@@ -1,4 +1,4 @@
-## Unreleased
+## 0.7.0
 
 * Stops reporting filters that are drawn. `vector_graphics_compiler` 1.3.6,
   which needs Flutter 3.41, draws `feGaussianBlur`, `feOffset` and `feMerge`,
